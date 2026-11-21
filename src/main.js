@@ -16,6 +16,12 @@ function doGet(e) {
     c.nowText = formatDateTime_(now_());
     return page_(c.evaluate(), 'Проверки');
   }
+  if (p.page === 'pult') {
+    if (!isStaffKey_(p.key)) return page_(HtmlService.createHtmlOutput('<p style="font-family:sans-serif">Нет доступа.</p>'), 'Нет доступа');
+    var u = HtmlService.createTemplateFromFile('pult_page');
+    u.key = p.key;
+    return page_(u.evaluate(), 'Пульт');
+  }
   if (p.page === 'reschedule') {
     var r = HtmlService.createTemplateFromFile('reschedule_page');
     r.backUrl = token ? CONFIG.WEB_APP_URL + '?t=' + token : '';
@@ -24,6 +30,7 @@ function doGet(e) {
   if (p.t !== undefined) {
     var t = HtmlService.createTemplateFromFile('patient_page');
     t.token = token;
+    t.staleMin = CONFIG.STALE_MIN;
     t.rescheduleUrl = CONFIG.WEB_APP_URL + '?page=reschedule&t=' + token;
     return page_(t.evaluate(), 'Ваш приём');
   }

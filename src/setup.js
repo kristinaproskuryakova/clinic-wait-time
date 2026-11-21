@@ -7,6 +7,12 @@ function setupSheets() {
   var ss = SpreadsheetApp.getActive();
   Object.keys(COLUMNS).forEach(function (name) {
     var sheet = ss.getSheetByName(name) || ss.insertSheet(name);
+    var headers0 = COLUMNS[name];
+    if (sheet.getLastRow() > 0 && sheet.getLastColumn() < headers0.length) {
+      // В коде появились новые колонки — дописываем их заголовки справа, данные не трогаем.
+      if (sheet.getMaxColumns() < headers0.length) sheet.insertColumnsAfter(sheet.getMaxColumns(), headers0.length - sheet.getMaxColumns());
+      sheet.getRange(1, 1, 1, headers0.length).setValues([headers0]).setFontWeight('bold');
+    }
     if (sheet.getLastRow() === 0) {
       var headers = COLUMNS[name];
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
@@ -39,7 +45,8 @@ function formatSheets_() {
     'Записи': { 'Запись создана': dateTime, 'Дата и время приёма': dateTime, 'Телефон': '@' },
     'Врачи': { 'Кабинет': '@', 'Начало обеда': '@' },
     'Приёмы': { 'Дата и время приёма': dateTime, 'Телефон (4 цифры)': '@', 'Пришёл': 'HH:mm',
-      'Начало': 'HH:mm', 'Окончание': 'HH:mm', 'Прогноз': 'HH:mm' },
+      'Начало': 'HH:mm', 'Окончание': 'HH:mm', 'Прогноз': 'HH:mm',
+      'Ниж. (расчёт)': 'HH:mm', 'Верх. (расчёт)': 'HH:mm', 'Ниж. (показ)': 'HH:mm', 'Верх. (показ)': 'HH:mm' },
     'Журнал SMS': { 'Отправлено': dateTime },
   };
   Object.keys(formats).forEach(function (name) {
@@ -74,7 +81,9 @@ function onOpen() {
       .addItem('Создать демо-день', 'menuCreateDemoDay')
       .addItem('Обновить очередь из записей', 'menuSyncFromBookings')
       .addItem('Ссылка пациента (выделенная строка «Приёмов»)', 'menuShowPatientLink')
+      .addItem('Демо: задержка 20 минут у врача (выделенная строка «Приёмов»)', 'menuDemoDelay')
       .addSeparator()
+      .addItem('Включить таймер', 'menuInstallTimer')
       .addItem('Служебные ссылки', 'menuShowStaffLinks')
       .addItem('Создать листы', 'setupSheets')
       .addToUi();

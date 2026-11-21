@@ -85,6 +85,59 @@ function createDemoDay_() {
     ', приёмов ' + created + '. Сегодня по демо-времени: ' + formatDateTime_(now_()).slice(0, 10) + '.';
 }
 
+/**
+ * Пункт меню «Демо: задержка 20 минут у врача»: для врача из выделенной строки «Приёмов»
+ * все сегодняшние приёмы, которые по демо-времени уже должны были пройти, отмечает «состоялся»
+ * с опозданием на 20 минут, а текущий — «идёт». Потом сразу пересчёт и публикация.
+ * Так виден интервал без ручного ввода времени (отметки врача появятся на этапе 6).
+ */
+function menuDemoDelay() {
+  var ui = SpreadsheetApp.getUi();
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var row = sheet.getActiveCell().getRow();
+  if (sheet.getName() !== SHEETS.APPOINTMENTS || row < 2) {
+    ui.alert('Открой лист «Приёмы» и встань на строку любого приёма нужного врача.');
+    return;
+  }
+  var doctor = sheet.getRange(row, apptCol_('Врач') + 1).getValue();
+  ui.alert(demoDelay_(doctor, CONFIG.DEMO_DELAY_MIN));
+}
+
+function demoDelay_(doctor, delayMin) {
+  var n = now_();
+  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.APPOINTMENTS);
+  var rows = readRows_(SHEETS.APPOINTMENTS);
+  var c = apptCol_;
+  var mine = [];
+  rows.forEach(function (r, i) {
+    var at = r[c('Дата и время приёма')];
+    var status = normalizeStatus_(r[c('Статус')]);
+    if (r[c('Врач')] !== doctor || !isDate_(at) || daysBetween_(n, at) !== 0) return;
+    if (status === STATUS.CANCELLED || status === STATUS.NO_SHOW) return;
+    mine.push({ i: i, at: at, dur: Number(r[c('Длительность, мин')]) || durationMin_() });
+  });
+  mine.sort(function (a, b) { return a.at - b.at; });
+  var done = 0, going = '';
+  mine.forEach(function (a) {
+    var start = addMin_(a.at, delayMin);
+    var end = addMin_(start, a.dur);
+    var r = a.i + 2;
+    if (end <= n) {
+      sheet.getRange(r, c('Начало') + 1, 1, 2).setValues([[start, end]]);
+      sheet.getRange(r, c('Статус') + 1).setValue(STATUS.DONE);
+      done++;
+    } else if (start <= n && !going) {
+      sheet.getRange(r, c('Начало') + 1, 1, 2).setValues([[start, '']]);
+      sheet.getRange(r, c('Статус') + 1).setValue(STATUS.IN_PROGRESS);
+      going = formatTime_(a.at);
+    }
+  });
+  recalc_(n);
+  publish_(n);
+  return 'Врач ' + doctor + ': «состоялся» с опозданием ' + delayMin + ' мин — ' + done + ' приём(ов)' +
+    (going ? ', «идёт» — приём на ' + going : '') + '. Прогноз пересчитан и опубликован (' + formatTime_(n) + ').';
+}
+
 // ---------- внутреннее ----------
 
 function demoName_(i) {

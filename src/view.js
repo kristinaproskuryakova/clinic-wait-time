@@ -4,7 +4,7 @@
  * Тексты статусов — из requirements.md, раздел «Статусы страницы» (тест 22).
  *
  * appt — { number, doctor, department, at: Date приёма, status, startedAt: Date|'' }
- * Интервал и «задерживается» добавятся на этапе 3 (прогноз).
+ * appt.shownLower / shownUpper — опубликованный интервал (этап 3). Если они разные — показываем интервал.
  */
 function buildPatientView_(appt, nowDate) {
   var at = appt.at;
@@ -53,8 +53,16 @@ function buildPatientView_(appt, nowDate) {
     view.kind = 'past';                        // день прошёл, а статус не закрыт — только дата и время
     return view;
   }
-  view.kind = 'today';
   view.dateText = 'Сегодня';
+  if (isDate_(appt.shownLower) && isDate_(appt.shownUpper) && appt.shownUpper > appt.shownLower) {
+    // Прогноз сдвинулся больше чем на 5 минут: интервал и «задерживается» (тест 22). Х — нижняя граница (Б13).
+    view.kind = 'delayed';
+    view.timeText = patientTime_(appt.shownLower) + '–' + patientTime_(appt.shownUpper);
+    view.message = 'Сегодня приём у врача ' + appt.doctor + ' задерживается. Приходите к ' +
+      patientTime_(appt.shownLower);
+    return view;
+  }
+  view.kind = 'today';
   view.message = 'Ваш приём назначен на ' + patientTime_(at) + ', приходите вовремя';
   return view;
 }

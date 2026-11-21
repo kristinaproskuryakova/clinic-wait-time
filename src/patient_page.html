@@ -33,6 +33,7 @@
     .time { font-size: clamp(36px, 11vw, 48px); font-weight: 800; line-height: 1.1; }
     .message { font-size: 17px; line-height: 1.35; margin: 0; }
     .cancelled .time { color: var(--off); text-decoration: line-through; }
+    .delayed .time { color: var(--warn); }
     .btn {
       display: block; text-align: center; text-decoration: none; font-weight: 600; font-size: 16px;
       background: var(--accent); color: var(--accent-text); border-radius: 12px; padding: 14px;
@@ -91,7 +92,15 @@
       show('problem');
     }
 
-    Api.getPatientView(TOKEN, deviceId()).then(function (res) {
+    // Заглушка хранится в самой странице (тест 34): показывается, если сервер говорит, что публикаций
+    // не было 6 минут, или если сама страница 6 минут не может получить данные.
+    var STUB = 'Информация об очереди временно недоступна. Ваша запись сохраняется, приходите ко времени, указанному в SMS';
+    var STALE_MS = <?!= JSON.stringify(staleMin) ?> * 60000;
+    var lastOk = 0;          // когда страница последний раз получила данные (по счётчику страницы, не по часам)
+    var started = performance.now();
+    var showingAppt = false;
+
+    function render(res) {
       if (res.state === 'invalid') return problem('Ссылка недействительна', 'Проверьте ссылку из SMS.');
       if (res.state === 'blocked') return problem('Слишком много неверных попыток',
         'Доступ временно закрыт. Попробуйте через ' + res.minutes + ' минут.');
@@ -103,11 +112,30 @@
       document.getElementById('time').textContent = v.timeText;
       document.getElementById('message').textContent = v.message;
       document.getElementById('appt').className = 'card ' + v.kind;
+      document.querySelector('.when').hidden = !!res.stale;
+      if (res.stale) document.getElementById('message').textContent = STUB;
       document.getElementById('reschedule').hidden = false; // кнопка видна при любом статусе (тест 45)
+      showingAppt = true;
       show('appt');
-    }).catch(function () {
-      problem('Не удалось загрузить', 'Обновите страницу через минуту.');
-    });
+    }
+
+    function load() {
+      Api.getPatientView(TOKEN, deviceId()).then(function (res) {
+        lastOk = performance.now();
+        render(res);
+        if (res.state === 'ok') setTimeout(load, (res.refreshSec || 60) * 1000);
+      }).catch(function () {
+        var since = performance.now() - (lastOk || started);
+        if (showingAppt && since >= STALE_MS) {
+          document.querySelector('.when').hidden = true;
+          document.getElementById('message').textContent = STUB;
+        } else if (!showingAppt) {
+          problem('Не удалось загрузить', 'Обновите страницу через минуту.');
+        }
+        setTimeout(load, 60000);
+      });
+    }
+    load();
   </script>
 </body>
 </html>

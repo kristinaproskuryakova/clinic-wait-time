@@ -77,8 +77,10 @@ function syncFromBookings_() {
     used.push(number);
     known[token] = true;
     // Порядок как в COLUMNS['Приёмы'].
-    fresh.push([token, number, b[6], b[3], b[4], duration, phoneLast4_(b[7]),
-      '', '', '', '', '', STATUS.WAITING]);
+    var row = [token, number, b[6], b[3], b[4], duration, phoneLast4_(b[7]),
+      '', '', '', '', '', STATUS.WAITING];
+    while (row.length < COLUMNS[SHEETS.APPOINTMENTS].length) row.push('');
+    fresh.push(row);
   });
 
   if (fresh.length) {

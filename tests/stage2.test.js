@@ -71,6 +71,7 @@ function setupServer() {
   const good = g.generateToken_();
   g.findAppointment_ = (t) => (t === good ? appt() : null);
   g.now_ = () => NOW;
+  g.isStale_ = () => false; // публикация свежая (заглушка проверяется в этапе 3)
   return good;
 }
 
@@ -94,8 +95,11 @@ test('правильный токен → данные приёма; мусор 
 });
 
 test('внутренние функции закрыты от вызова со страницы', () => {
-  const allowed = ['doGet', 'onOpen', 'onEdit', 'setupSheets', 'getPatientView',
-    'menuCreateDemoDay', 'menuSyncFromBookings', 'menuShowStaffLinks', 'menuShowPatientLink'];
+  // Открытые: точки входа Google (doGet, onOpen, onEdit, onTimer), пункты меню (работают только из таблицы),
+  // getPatientView (отдаёт один приём по токену) и pultAction (без ключа служебных страниц не работает).
+  const allowed = ['doGet', 'onOpen', 'onEdit', 'onTimer', 'setupSheets', 'getPatientView', 'pultAction',
+    'menuCreateDemoDay', 'menuSyncFromBookings', 'menuShowStaffLinks', 'menuShowPatientLink',
+    'menuDemoDelay', 'menuInstallTimer'];
   const fresh = loadSrc();
   const open = Object.keys(fresh).filter((k) => typeof fresh[k] === 'function' && !k.endsWith('_'));
   assert.deepStrictEqual(open.sort(), allowed.sort());

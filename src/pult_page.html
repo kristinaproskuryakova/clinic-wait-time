@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root { --bg:#f6f7f9; --card:#fff; --text:#1b1f24; --muted:#5b636d; --accent:#0b6bcb; --warn:#9a5b00; --bad:#cf222e; --ok:#1a7f37; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#111417; --card:#1b1f24; --text:#eef1f4; --muted:#a3acb6; --accent:#4a9cf0; --warn:#f0b35a; --bad:#ff7b72; --ok:#56d364; }
+    }
+    body { margin:0; padding:16px; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
+    h1 { font-size:22px; margin:0 0 12px; }
+    .card { background:var(--card); border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-bottom:12px; }
+    .now { font-size:32px; font-weight:800; }
+    .muted { color:var(--muted); font-size:14px; }
+    dl { display:grid; grid-template-columns:auto 1fr; gap:6px 12px; margin:0; font-size:15px; }
+    dt { color:var(--muted); } dd { margin:0; font-weight:600; }
+    .row { display:flex; gap:8px; flex-wrap:wrap; }
+    button { font:inherit; font-weight:600; border:0; border-radius:10px; padding:12px 16px; cursor:pointer;
+             background:var(--accent); color:#fff; }
+    button.secondary { background:transparent; color:var(--accent); box-shadow:inset 0 0 0 2px var(--accent); }
+    button:disabled { opacity:.5; cursor:wait; }
+    .bad { color:var(--bad); } .ok { color:var(--ok); } .warn { color:var(--warn); }
+  </style>
+</head>
+<body>
+  <h1>Пульт</h1>
+  <div class="card">
+    <div class="muted" id="mode">…</div>
+    <div class="now" id="now">…</div>
+    <div class="row" style="margin-top:12px">
+      <button id="plus3">+3 минуты</button>
+      <button id="cycle" class="secondary">Пересчитать и опубликовать</button>
+    </div>
+  </div>
+  <div class="card">
+    <dl>
+      <dt>Последняя публикация</dt><dd id="published">…</dd>
+      <dt>Страницы сейчас</dt><dd id="stale">…</dd>
+      <dt>Часы работы</dt><dd id="working">…</dd>
+      <dt>Таймер</dt><dd id="timer">…</dd>
+      <dt>Имитация сбоя</dt><dd id="failure">…</dd>
+    </dl>
+    <div class="row" style="margin-top:12px">
+      <button id="failToggle" class="secondary">…</button>
+    </div>
+    <p class="muted">Демо-время задаётся в таблице: «Настройки → Демо-время». Таймер включается в меню таблицы.</p>
+  </div>
+
+  <script>
+    var KEY = <?!= JSON.stringify(key) ?>;
+    var state = null;
+    function call(action) {
+      var buttons = document.querySelectorAll('button');
+      buttons.forEach(function (b) { b.disabled = true; });
+      google.script.run
+        .withSuccessHandler(function (s) { buttons.forEach(function (b) { b.disabled = false; }); render(s); })
+        .withFailureHandler(function (e) { buttons.forEach(function (b) { b.disabled = false; }); alert(e.message); })
+        .pultAction(KEY, action);
+    }
+    function set(id, text, cls) { var el = document.getElementById(id); el.textContent = text; el.className = cls || ''; }
+    function render(s) {
+      state = s;
+      set('mode', s.demo ? 'Демо-время' : 'Настоящие часы');
+      set('now', s.now);
+      set('published', s.publishedAt + (s.minutesSincePublish !== null ? ' (' + s.minutesSincePublish + ' мин назад)' : ''));
+      set('stale', s.stale ? 'заглушка (нет публикаций 6 минут)' : 'данные свежие', s.stale ? 'bad' : 'ok');
+      set('working', s.working ? 'клиника работает' : 'клиника закрыта');
+      set('timer', s.timer ? 'включён' : 'выключен — меню таблицы «Включить таймер»', s.timer ? 'ok' : 'warn');
+      set('failure', s.failure ? 'да — публикация выключена' : 'нет', s.failure ? 'bad' : '');
+      document.getElementById('failToggle').textContent = s.failure ? 'Выключить имитацию сбоя' : 'Включить имитацию сбоя';
+    }
+    document.getElementById('plus3').onclick = function () { call('plus3'); };
+    document.getElementById('cycle').onclick = function () { call('cycle'); };
+    document.getElementById('failToggle').onclick = function () { call(state && state.failure ? 'failOff' : 'failOn'); };
+    call('state');
+    setInterval(function () { call('state'); }, 30000);
+  </script>
+</body>
+</html>

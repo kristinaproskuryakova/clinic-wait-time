@@ -31,6 +31,7 @@ function staffUrl_(page) {
 function menuShowStaffLinks() {
   var ui = SpreadsheetApp.getUi();
   var links = [
+    ['Пульт (демо-время, +3 минуты, сбой)', staffUrl_('pult')],
     ['Проверки (тесты по номерам)', staffUrl_('checks')],
   ];
   var html = '<div style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.5">' +
@@ -39,7 +40,7 @@ function menuShowStaffLinks() {
       return '<p><b>' + l[0] + '</b><br><a href="' + l[1] + '" target="_blank">открыть</a></p>';
     }).join('') + '</div>';
   ui.showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(420).setHeight(200), 'Служебные ссылки');
+    HtmlService.createHtmlOutput(html).setWidth(420).setHeight(260), 'Служебные ссылки');
 }
 
 /**

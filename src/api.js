@@ -23,24 +23,33 @@ function getPatientView(token, deviceId) {
     cache.put(failKey, String(fails + 1), CONFIG.BLOCK_MIN * 60);
     return { state: 'invalid' };
   }
-  return { state: 'ok', view: buildPatientView_(appt, now_()) };
+  var n = now_();
+  var view = buildPatientView_(appt, n);
+  // Заглушка (тест 34): для сегодняшнего приёма, если публикации не было STALE_MIN минут.
+  var stale = (view.kind === 'today' || view.kind === 'delayed') && isStale_(n);
+  return { state: 'ok', view: view, stale: stale, refreshSec: CONFIG.PAGE_REFRESH_SEC };
 }
 
 /** Один приём по токену — только нужные поля. null, если такого токена нет. */
 function findAppointment_(token) {
   var rows = readRows_(SHEETS.APPOINTMENTS);
-  var c = function (name) { return apptCol_(name); };
   for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    if (r[c('Токен')] !== token) continue;
-    return {
-      number: r[c('Номер')],
-      doctor: r[c('Врач')],
-      department: r[c('Отделение')],
-      at: r[c('Дата и время приёма')],
-      status: normalizeStatus_(r[c('Статус')]),
-      startedAt: r[c('Начало')],
-    };
+    if (rows[i][apptCol_('Токен')] === token) return apptFromRow_(rows[i]);
   }
   return null;
+}
+
+/** Строка «Приёмов» → приём для страницы и экрана. Без телефона и токена. */
+function apptFromRow_(r) {
+  var c = apptCol_;
+  return {
+    number: r[c('Номер')],
+    doctor: r[c('Врач')],
+    department: r[c('Отделение')],
+    at: r[c('Дата и время приёма')],
+    status: normalizeStatus_(r[c('Статус')]),
+    startedAt: r[c('Начало')],
+    shownLower: r[c('Ниж. (показ)')],   // опубликованный интервал (этап 3)
+    shownUpper: r[c('Верх. (показ)')],
+  };
 }
