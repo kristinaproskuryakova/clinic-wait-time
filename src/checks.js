@@ -12,7 +12,7 @@ function runChecks_() {
     check30_(bookings),
     check42_(appts),
     check43_(),
-  ].concat(forecastChecks_(), screenChecks_(appts), lateChecks_(appts));
+  ].concat(forecastChecks_(), screenChecks_(appts), lateChecks_(appts), doctorChecks_());
 }
 
 /** Этап 4: экраны отделений на живых данных таблицы (тесты 12, 13). */
@@ -201,9 +201,11 @@ function lateChecks_(rows) {
     v1.message.indexOf('Прием может быть сокращен') >= 0,
     'Пришёл в 12.06 на 12.00 и не пришёл к 12.06 — оба видят текст об опоздании.'));
   var ok46 = !isLate20_(A(), T(12, 19)) && isLate20_(A(), T(12, 20)) &&
-    isLate20_(A({ shownLower: T(12, 10), shownUpper: T(12, 20) }), T(12, 40));
-  out.push(result_(46, 'Опоздание 20+ минут подсвечено (часть «врач не ответил» — этап 6)', ok46 ? 'частично' : false,
-    'Подсветка с 12.20 для приёма в 12.00 и с 12.40 для интервала 12.10–12.20. На странице регистратуры смотришь ты.'));
+    isLate20_(A({ shownLower: T(12, 10), shownUpper: T(12, 20) }), T(12, 40)) &&
+    windowStage_(T(12, 0), T(12, 9)) === 'remind' && windowStage_(T(12, 0), T(12, 10)) === 'registry';
+  out.push(result_(46, 'Регистратура: подсветка опоздания 20+ и «врач не ответил»', ok46,
+    'Опоздание: с 12.20 для приёма в 12.00, с 12.40 для интервала 12.10–12.20. Вопрос врачу в 12.00 без ответа → ' +
+    'напоминание в 12.05, регистратура в 12.10. Подсветку на странице регистратуры смотришь ты.'));
 
   var n = now_();
   var openToday = rows.map(apptFromRow_).filter(function (a) {
@@ -214,6 +216,69 @@ function lateChecks_(rows) {
     closedNow ? 'Рабочий день закончился. Незакрытых приёмов сегодня: ' + openToday + '.'
       : 'Рабочий день ещё идёт. Незакрытых приёмов сейчас: ' + openToday + '. Проверь после ' + closeTime_() + '.'));
   return out;
+}
+
+/** Этап 6: окна врача, запланированное окончание, задержка, автоматическая неявка (примеры). */
+function doctorChecks_() {
+  var T = function (h, m) { return new Date(2026, 10, 21, h, m); };
+  var hm = function (d) { return d ? d.getHours() + '.' + pad2_(d.getMinutes()) : '—'; };
+  var A = function (key, h, m, x) {
+    var a = { key: key, at: T(h, m), duration: 25, status: STATUS.WAITING, arrivedAt: '', startedAt: '', endedAt: '',
+      cardOpenedAt: '', cardClosedAt: '', lateRef: '', shownLower: '', shownUpper: '', doctor: 'Врач' };
+    Object.keys(x || {}).forEach(function (k) { a[k] = x[k]; });
+    return a;
+  };
+  var arrived = function (h, m, x) {
+    var o = { status: STATUS.ARRIVED, arrivedAt: T(h, m) };
+    Object.keys(x || {}).forEach(function (k) { o[k] = x[k]; });
+    return o;
+  };
+  var going = A('p', 11, 30, { status: STATUS.IN_PROGRESS, arrivedAt: T(11, 25), startedAt: T(11, 35) });
+  var done = A('p', 11, 30, { status: STATUS.DONE, arrivedAt: T(11, 25), startedAt: T(11, 35), endedAt: T(12, 10) });
+  var next = A('a', 12, 0, arrived(11, 50));
+  var lateEnd = function (key, h) {
+    return A(key, h, 0, { status: STATUS.DONE, arrivedAt: T(h - 1, 55), startedAt: T(h, 20), endedAt: T(h, 45) });
+  };
+  var cases = [
+    [1, 'Окно только для пришедших', function () {
+      return String(doctorWindow_([A('a', 12, 0)], T(12, 30))) + ' / ' + doctorWindow_([next], T(12, 0)).type; }, 'null / start'],
+    [2, 'Окно: в назначенное время / приход + 2 / при открытии карты', function () {
+      return [startDue_(A('a', 12, 0, arrived(11, 58)), null), startDue_(A('a', 12, 0, arrived(11, 59)), null),
+        startDue_(A('a', 12, 0, arrived(11, 50, { cardOpenedAt: T(11, 53) })), null)].map(hm).join(' / '); }, '12.00 / 12.01 / 11.53'],
+    [3, 'Пока предыдущий не закрыт — только «Приём окончен?»; потом через 1 минуту', function () {
+      return doctorWindow_([going, next], T(12, 2)).type + ' / ' + hm(doctorWindow_([done, next], T(12, 11)).due); }, 'end / 12.11'],
+    [4, 'Нет ответа: напоминание через 5 минут, регистратура ещё через 5', function () {
+      return [T(12, 0), T(12, 5), T(12, 10)].map(function (n) { return windowStage_(T(12, 0), n); }).join(' / '); },
+      'ask / remind / registry'],
+    [5, '«Приём окончен?» — в запланированное окончание или при закрытии карты', function () {
+      var g2 = A('p', 12, 0, { status: STATUS.IN_PROGRESS, arrivedAt: T(11, 55), startedAt: T(12, 0) });
+      var g3 = A('p', 12, 0, { status: STATUS.IN_PROGRESS, arrivedAt: T(11, 55), startedAt: T(12, 0), cardClosedAt: T(12, 18) });
+      return hm(doctorWindow_([g2], T(12, 25)).due) + ' / ' + hm(doctorWindow_([g3], T(12, 18)).due); }, '12.25 / 12.18'],
+    [6, 'Запланированное окончание: вовремя / опоздал / опоздал при задержке', function () {
+      return [plannedEnd_(A('a', 12, 0, { arrivedAt: T(11, 30), startedAt: T(11, 40) }), false),
+        plannedEnd_(A('a', 12, 0, { arrivedAt: T(12, 10), startedAt: T(12, 12) }), false),
+        plannedEnd_(A('a', 12, 0, { arrivedAt: T(12, 30), startedAt: T(12, 31), lateRef: T(12, 20) }), true)].map(hm).join(' / '); },
+      '12.05 / 12.30 / 12.50'],
+    [7, 'Пришёл раньше: окно при открытии карты, прогноз следующего не меняется', function () {
+      var e = A('a', 14, 0, arrived(13, 30, { cardOpenedAt: T(13, 31) }));
+      var s = A('a', 14, 0, { status: STATUS.IN_PROGRESS, arrivedAt: T(13, 30), startedAt: T(13, 31) });
+      return hm(doctorWindow_([e], T(13, 31)).due) + ' / ' + hm(forecastDoctorDay_([s, A('n', 14, 30)], null, T(13, 35)).n.forecast); },
+      '13.31 / 14.30'],
+    [16, 'Задержка: 3 приёма подряд на 20+ минут позже расписания', function () {
+      var nextI = A('d', 12, 0, { shownLower: T(12, 20), shownUpper: T(12, 30) });
+      return [doctorDelay_([lateEnd('a', 9), lateEnd('b', 10), nextI]), doctorDelay_([lateEnd('a', 9), lateEnd('b', 10), lateEnd('c', 11), nextI]),
+        doctorDelay_([lateEnd('a', 9), lateEnd('b', 10), lateEnd('c', 11), A('d', 12, 0)])].join(' / '); }, 'false / true / false'],
+    [23, 'Автоматическая неявка: только если следующий начат не раньше своего времени', function () {
+      var s = A('z', 13, 0, { status: STATUS.IN_PROGRESS, arrivedAt: T(12, 50), startedAt: T(13, 0) });
+      var e = A('z', 13, 0, { status: STATUS.IN_PROGRESS, arrivedAt: T(12, 50), startedAt: T(12, 55) });
+      return autoNoShows_([A('x', 12, 0), s], s).join(',') + ' / ' + (autoNoShows_([A('x', 12, 0), e], e).join(',') || 'нет'); },
+      'x / нет'],
+  ];
+  return cases.map(function (k) {
+    var got;
+    try { got = k[2](); } catch (e) { got = 'ошибка: ' + e.message; }
+    return result_(k[0], k[1], got === k[3], 'Ожидается: ' + k[3] + '. Получено: ' + got + '.');
+  });
 }
 
 function result_(num, title, ok, details) {

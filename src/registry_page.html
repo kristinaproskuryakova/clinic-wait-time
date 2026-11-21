@@ -58,7 +58,7 @@
   </div>
   <div class="legend">
     <span><span class="sw" style="background:var(--late-bg)"></span>опаздывает (прошла граница «вовремя»)</span>
-    <span><span class="sw" style="background:var(--late20-bg)"></span>опоздание 20+ минут — нужно действие</span>
+    <span><span class="sw" style="background:var(--late20-bg)"></span>нужно действие: опоздание 20+ минут или врач не ответил</span>
   </div>
 
   <dialog id="resched">
@@ -114,10 +114,12 @@
         return !q || String(it.number) === q || it.last4.indexOf(q) >= 0 || it.doctor.toLowerCase().indexOf(q) >= 0;
       }).forEach(function (it) {
         var tr = el('tr');
-        tr.className = it.late20 ? 'late20' : (it.late ? 'late' : '');
+        tr.className = (it.late20 || it.question) ? 'late20' : (it.late ? 'late' : '');
         [[it.number, 'num'], [it.time], [it.shown], [it.doctor], [it.department], [it.last4], [it.arrived], [it.status]]
           .forEach(function (c) { tr.appendChild(el('td', c[0], c[1])); });
-        tr.appendChild(el('td', it.late20 ? 'опоздание 20+ мин' : (it.late ? 'опаздывает' : ''), 'flag'));
+        var flag = it.question ? 'врач не ответил: ' + (it.question.type === 'start' ? 'начался ли приём?' : 'приём окончен?')
+          : (it.late20 ? 'опоздание 20+ мин' : (it.late ? 'опаздывает' : ''));
+        tr.appendChild(el('td', flag, 'flag'));
 
         var cell = el('td');
         var box = el('div', undefined, 'actions');
@@ -128,6 +130,18 @@
             if (confirm('Отменить приём № ' + it.number + '?')) act(it.token, 'cancel');
           }, true));
           box.appendChild(button('Не пришёл', function () { act(it.token, 'noshow'); }, true));
+        }
+        if (it.question) {
+          // Ответ за врача: «вовремя» (время показа окна) или точное время с шагом 5 минут.
+          var q = it.question;
+          var ans = el('select');
+          var o0 = el('option', (q.type === 'start' ? 'Начался' : 'Окончен') + ' вовремя (' + q.due + ')'); o0.value = 'on_time';
+          ans.appendChild(o0);
+          q.options.forEach(function (t) { var o = el('option', t); o.value = t; ans.appendChild(o); });
+          box.appendChild(ans);
+          box.appendChild(button('Ответить', function () {
+            act(it.token, q.type === 'start' ? 'answerStart' : 'answerEnd', ans.value);
+          }));
         }
         var sel = el('select');
         sel.appendChild(el('option', 'Статус…'));

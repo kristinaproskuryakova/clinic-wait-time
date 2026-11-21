@@ -53,5 +53,9 @@ function apptFromRow_(r) {
     shownUpper: r[c('Верх. (показ)')],
     arrivedAt: r[c('Пришёл')],          // отметка регистратуры (этап 5)
     lateRef: r[c('Опоздание от')],
+    endedAt: r[c('Окончание')],         // модуль врача (этап 6)
+    duration: Number(r[c('Длительность, мин')]) || CONFIG.DEFAULT_DURATION_MIN,
+    cardOpenedAt: r[c('Карта открыта')],
+    cardClosedAt: r[c('Карта закрыта')],
   };
 }

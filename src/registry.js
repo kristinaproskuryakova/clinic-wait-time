@@ -44,6 +44,16 @@ function registryAction(key, token, action, payload) {
       var problem = rescheduleProblem_(d, n);
       if (problem) throw new Error(problem);
       rescheduleAppointment_(token, d);
+    } else if (action === 'answerStart' || action === 'answerEnd') {
+      // Ответ регистратуры за врача (решения Б7, Б20): «вовремя» = время показа окна врачу, иначе время с шагом 5 минут.
+      var ctx = doctorContext_(appt.doctor, n);
+      var a = ctx.byKey[token];
+      var w = doctorWindow_(ctx.appts, n);
+      var type = action === 'answerStart' ? 'start' : 'end';
+      if (!w || w.key !== token || w.type !== type) throw new Error('У врача сейчас нет такого вопроса по этому пациенту');
+      var at = payload === 'on_time' ? w.due : parseDemoTime_(String(payload), n);
+      if (!isDate_(at) || at > n) throw new Error('Неверное время');
+      if (type === 'start') startAppointment_(ctx, a, at); else endAppointment_(ctx, a, at);
     } else if (action === 'status') {
       var st = normalizeStatus_(payload);
       if (!st) throw new Error('Нет такого статуса: ' + payload);
@@ -87,6 +97,7 @@ function rescheduleAppointment_(token, newAt) {
 function registryState_(n) {
   var c = apptCol_;
   var items = [];
+  var questions = registryQuestions_(n);   // вопросы врача без ответа 10 минут (тест 46)
   readRows_(SHEETS.APPOINTMENTS).forEach(function (r) {
     var a = apptFromRow_(r);
     if (!isDate_(a.at) || daysBetween_(n, a.at) !== 0) return;
@@ -105,6 +116,11 @@ function registryState_(n) {
       late: isLateArrival_(a) || isAbsentLate_(a, n),
       late20: isLate20_(a, n),
       pending: isPending_(a),
+      question: questions[r[c('Токен')]] ? {
+        type: questions[r[c('Токен')]].type,
+        due: formatTime_(questions[r[c('Токен')]].due),
+        options: answerTimeOptions_(questions[r[c('Токен')]].due, n),
+      } : null,
     });
   });
   items.sort(function (x, y) { return x.at - y.at || x.number - y.number; });

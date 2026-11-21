@@ -34,14 +34,16 @@ function menuShowStaffLinks() {
     ['Регистратура', staffUrl_('registry')],
     ['Пульт (демо-время, +3 минуты, сбой)', staffUrl_('pult')],
     ['Проверки (тесты по номерам)', staffUrl_('checks')],
-  ].concat(departments_().map(function (dep) { return ['Экран: ' + dep, screenUrl_(dep)]; }));
+  ].concat(readRows_(SHEETS.DOCTORS).filter(function (d) { return d[0]; }).map(function (d) {
+    return ['Врач: ' + d[0], staffUrl_('doctor') + '&d=' + encodeURIComponent(d[0])];
+  }), departments_().map(function (dep) { return ['Экран: ' + dep, screenUrl_(dep)]; }));
   var html = '<div style="font-family:system-ui,sans-serif;font-size:14px;line-height:1.5">' +
     '<p>Эти ссылки — только для сотрудников. Не отправляй их пациентам.</p>' +
     links.map(function (l) {
       return '<p><b>' + l[0] + '</b><br><a href="' + l[1] + '" target="_blank">открыть</a></p>';
     }).join('') + '</div>';
   ui.showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(420).setHeight(480), 'Служебные ссылки');
+    HtmlService.createHtmlOutput(html).setWidth(440).setHeight(620), 'Служебные ссылки');
 }
 
 /**

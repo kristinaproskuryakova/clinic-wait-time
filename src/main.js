@@ -5,6 +5,7 @@
  *  - ?screen=ОТДЕЛЕНИЕ              → экран отделения (табло);
  *  - ?page=pult&key=…               → служебная страница «Пульт»;
  *  - ?page=registry&key=…           → служебная страница «Регистратура»;
+ *  - ?page=doctor&d=ВРАЧ&key=…      → служебная страница врача;
  *  - ?page=checks&key=…             → служебная страница «Проверки» (только с правильным ключом);
  *  - без параметров                 → проверочная страница «Работает».
  */
@@ -18,6 +19,13 @@ function doGet(e) {
     c.results = runChecks_();
     c.nowText = formatDateTime_(now_());
     return page_(c.evaluate(), 'Проверки');
+  }
+  if (p.page === 'doctor') {
+    if (!isStaffKey_(p.key)) return page_(HtmlService.createHtmlOutput('<p style="font-family:sans-serif">Нет доступа.</p>'), 'Нет доступа');
+    var dt = HtmlService.createTemplateFromFile('doctor_page');
+    dt.key = p.key;
+    dt.doctor = String(p.d || '').slice(0, 80);
+    return page_(dt.evaluate(), 'Врач: ' + dt.doctor);
   }
   if (p.page === 'registry') {
     if (!isStaffKey_(p.key)) return page_(HtmlService.createHtmlOutput('<p style="font-family:sans-serif">Нет доступа.</p>'), 'Нет доступа');

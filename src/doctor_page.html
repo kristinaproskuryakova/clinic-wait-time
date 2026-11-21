@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root { --bg:#f6f7f9; --card:#fff; --text:#1b1f24; --muted:#5b636d; --line:#e3e7eb; --accent:#0b6bcb;
+            --warn:#9a5b00; --warn-bg:#fff4d6; --bad:#b42318; --bad-bg:#ffe1e1; --go:#1a7f37; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#111417; --card:#1b1f24; --text:#eef1f4; --muted:#a3acb6; --line:#2c3238; --accent:#4a9cf0;
+              --warn:#f0b35a; --warn-bg:#3a2f12; --bad:#ff8a80; --bad-bg:#4a1d1d; --go:#56d364; }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:16px; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
+    h1 { font-size:22px; margin:0; }
+    .muted { color:var(--muted); font-size:14px; }
+    .list { margin-top:14px; display:grid; gap:10px; max-width:720px; }
+    .pt { background:var(--card); border-radius:12px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.08);
+          display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .pt .name { font-weight:700; font-size:17px; }
+    .pt .going { color:var(--go); font-weight:600; }
+    button { font:inherit; font-weight:600; border:0; border-radius:9px; padding:9px 14px; cursor:pointer;
+             background:var(--accent); color:#fff; }
+    button.ghost { background:transparent; color:var(--accent); box-shadow:inset 0 0 0 1.5px var(--accent); }
+    dialog { border:0; border-radius:16px; padding:22px; background:var(--card); color:var(--text);
+             box-shadow:0 10px 40px rgba(0,0,0,.3); width:min(420px, 92vw); }
+    dialog::backdrop { background:rgba(0,0,0,.4); }
+    dialog h2 { margin:0 0 6px; font-size:22px; }
+    .badge { display:inline-block; font-size:13px; font-weight:700; border-radius:6px; padding:2px 8px; margin-bottom:8px; }
+    .badge.remind { background:var(--warn-bg); color:var(--warn); }
+    .badge.registry { background:var(--bad-bg); color:var(--bad); }
+    .row { display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+    .delay { margin-top:8px; color:var(--warn); font-weight:600; font-size:14px; }
+  </style>
+</head>
+<body>
+  <h1 id="title"><?= doctor ?></h1>
+  <div class="muted" id="now">…</div>
+  <div class="delay" id="delay" hidden>У вас задержка: 3 приёма подряд закончились на 20+ минут позже расписания.</div>
+  <div class="list" id="list"><div class="muted">Загружаем…</div></div>
+
+  <dialog id="win">
+    <div class="badge" id="winBadge" hidden></div>
+    <h2 id="winTitle"></h2>
+    <div class="muted" id="winWho"></div>
+    <div class="row">
+      <button class="ghost" id="winNo">Нет</button>
+      <button id="winYes">Да</button>
+    </div>
+  </dialog>
+
+  <script>
+    var KEY = <?!= JSON.stringify(key) ?>;
+    var DOCTOR = <?!= JSON.stringify(doctor) ?>;
+    var dismissed = {};   // «Нет»: окно скрыто до следующей ступени (напоминание, регистратура)
+    var current = null;
+
+    function run(fn, args) {
+      return new Promise(function (resolve, reject) {
+        var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        r[fn].apply(r, args);
+      });
+    }
+    function act(token, action) {
+      run('doctorAction', [KEY, DOCTOR, token, action]).then(render).catch(function (e) { alert(e.message); });
+    }
+    function el(tag, text, cls) {
+      var e = document.createElement(tag);
+      if (text !== undefined) e.textContent = text;
+      if (cls) e.className = cls;
+      return e;
+    }
+
+    function render(s) {
+      document.getElementById('now').textContent = 'Сейчас ' + s.now + ' · видны только пациенты, отмеченные регистратурой';
+      document.getElementById('delay').hidden = !s.delay;
+      var list = document.getElementById('list');
+      list.textContent = '';
+      if (!s.patients.length) list.appendChild(el('div', 'Пришедших пациентов пока нет.', 'muted'));
+      s.patients.forEach(function (p) {
+        var box = el('div', undefined, 'pt');
+        var info = el('div');
+        info.appendChild(el('div', p.name, 'name'));
+        info.appendChild(el('div', 'Приём на ' + p.time + (p.status === 'идёт' ? ' · ' : ''), 'muted'));
+        if (p.status === 'идёт') info.lastChild.appendChild(el('span', 'приём идёт', 'going'));
+        box.appendChild(info);
+        if (p.status === 'идёт') {
+          var close = el('button', p.cardClosed ? 'Карта закрыта' : 'Закрыть карту', 'ghost');
+          close.disabled = p.cardClosed;
+          close.onclick = function () { act(p.token, 'closeCard'); };
+          box.appendChild(close);
+        } else {
+          var open = el('button', p.cardOpen ? 'Карта открыта' : 'Открыть карту', 'ghost');
+          open.disabled = p.cardOpen;
+          open.onclick = function () { act(p.token, 'openCard'); };
+          box.appendChild(open);
+        }
+        list.appendChild(box);
+      });
+      showWindow(s.window);
+    }
+
+    function showWindow(w) {
+      var dlg = document.getElementById('win');
+      current = w;
+      var id = w ? w.token + ':' + w.type : null;
+      if (!w || dismissed[id] === w.stage) { if (dlg.open) dlg.close(); return; }
+      document.getElementById('winTitle').textContent = w.type === 'start' ? 'Начался ли приём?' : 'Приём окончен?';
+      document.getElementById('winWho').textContent = w.name + ' · приём на ' + w.time;
+      var badge = document.getElementById('winBadge');
+      badge.hidden = w.stage === 'ask';
+      badge.className = 'badge ' + w.stage;
+      badge.textContent = w.stage === 'remind' ? 'Напоминание' : 'Вопрос передан в регистратуру';
+      if (!dlg.open) dlg.showModal();
+    }
+
+    document.getElementById('winYes').onclick = function () {
+      if (!current) return;
+      document.getElementById('win').close();
+      act(current.token, current.type === 'start' ? 'startYes' : 'endYes');
+    };
+    document.getElementById('winNo').onclick = function () {
+      if (current) dismissed[current.token + ':' + current.type] = current.stage;
+      document.getElementById('win').close();
+    };
+
+    function load() { run('getDoctorView', [KEY, DOCTOR]).then(render).catch(function (e) {
+      document.getElementById('list').textContent = 'Не удалось загрузить: ' + e.message;
+    }); }
+    load();
+    setInterval(load, 15000);
+  </script>
+</body>
+</html>
