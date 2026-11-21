@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root { --bg:#f6f7f9; --card:#fff; --text:#1b1f24; --muted:#5b636d; --line:#e3e7eb; --accent:#0b6bcb;
+            --late-bg:#fff4d6; --late20-bg:#ffe1e1; --late20:#b42318; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg:#111417; --card:#1b1f24; --text:#eef1f4; --muted:#a3acb6; --line:#2c3238; --accent:#4a9cf0;
+              --late-bg:#3a2f12; --late20-bg:#4a1d1d; --late20:#ff8a80; }
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; padding:16px; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
+    header { display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; justify-content:space-between; margin-bottom:12px; }
+    h1 { font-size:22px; margin:0; }
+    .muted { color:var(--muted); font-size:14px; }
+    input[type=search] { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:8px; min-width:240px;
+                         background:var(--card); color:var(--text); }
+    .wrap { overflow-x:auto; background:var(--card); border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    table { width:100%; border-collapse:collapse; font-size:14px; font-variant-numeric:tabular-nums; }
+    th, td { padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap; }
+    th { color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--card); }
+    td.num { font-weight:800; font-size:16px; }
+    tr.late td { background:var(--late-bg); }
+    tr.late20 td { background:var(--late20-bg); }
+    .flag { font-weight:700; color:var(--late20); }
+    button, select { font:inherit; font-size:13px; padding:5px 9px; border-radius:7px; cursor:pointer; }
+    button { border:0; background:var(--accent); color:#fff; font-weight:600; }
+    button.ghost { background:transparent; color:var(--accent); box-shadow:inset 0 0 0 1.5px var(--accent); }
+    select { border:1px solid var(--line); background:var(--card); color:var(--text); }
+    .actions { display:flex; gap:6px; align-items:center; }
+    .legend { display:flex; gap:16px; margin:10px 0 0; font-size:13px; color:var(--muted); }
+    dialog { border:0; border-radius:14px; padding:20px; background:var(--card); color:var(--text);
+             box-shadow:0 10px 40px rgba(0,0,0,.25); width:min(380px, 92vw); }
+    dialog::backdrop { background:rgba(0,0,0,.35); }
+    dialog h2 { font-size:18px; margin:0 0 4px; }
+    dialog label { display:block; font-size:14px; color:var(--muted); margin:14px 0 4px; }
+    dialog input, dialog select.big { font:inherit; font-size:16px; width:100%; padding:8px 10px; border-radius:8px;
+             border:1px solid var(--line); background:var(--card); color:var(--text); }
+    dialog .row { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+    dialog .err { color:var(--late20); font-size:14px; margin-top:10px; min-height:1em; }
+    .sw { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-1px; margin-right:4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div><h1>Регистратура</h1><div class="muted" id="now">…</div></div>
+    <input type="search" id="q" placeholder="Номер, врач или 4 цифры телефона">
+  </header>
+  <div class="wrap">
+    <table>
+      <thead><tr>
+        <th>Номер</th><th>Запись</th><th>Показано</th><th>Врач</th><th>Отделение</th><th>Тел.</th>
+        <th>Пришёл</th><th>Статус</th><th></th><th>Действия</th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="10" class="muted">Загружаем…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="legend">
+    <span><span class="sw" style="background:var(--late-bg)"></span>опаздывает (прошла граница «вовремя»)</span>
+    <span><span class="sw" style="background:var(--late20-bg)"></span>опоздание 20+ минут — нужно действие</span>
+  </div>
+
+  <dialog id="resched">
+    <h2>Перенести приём</h2>
+    <div class="muted" id="reschedWho"></div>
+    <label for="reschedDate">Новая дата</label>
+    <input type="date" id="reschedDate">
+    <label for="reschedTime">Время</label>
+    <select id="reschedTime" class="big"></select>
+    <div class="err" id="reschedErr"></div>
+    <div class="row">
+      <button class="ghost" id="reschedCancel">Отмена</button>
+      <button id="reschedOk">Перенести</button>
+    </div>
+  </dialog>
+
+  <script>
+    var KEY = <?!= JSON.stringify(key) ?>;
+    var state = null;
+
+    function run(fn, args) {
+      return new Promise(function (resolve, reject) {
+        var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        r[fn].apply(r, args);
+      });
+    }
+    function act(token, action, payload) {
+      document.body.style.cursor = 'wait';
+      run('registryAction', [KEY, token, action, payload || '']).then(function (s) {
+        document.body.style.cursor = '';
+        render(s);
+      }).catch(function (e) { document.body.style.cursor = ''; alert(e.message); });
+    }
+    function el(tag, text, cls) {
+      var e = document.createElement(tag);
+      if (text !== undefined) e.textContent = text;
+      if (cls) e.className = cls;
+      return e;
+    }
+    function button(label, onClick, ghost) {
+      var b = el('button', label, ghost ? 'ghost' : '');
+      b.onclick = onClick;
+      return b;
+    }
+
+    function render(s) {
+      state = s;
+      document.getElementById('now').textContent = 'Сейчас ' + s.now + ' · приёмов сегодня: ' + s.items.length;
+      var q = document.getElementById('q').value.trim().toLowerCase();
+      var tbody = document.getElementById('rows');
+      tbody.textContent = '';
+      s.items.filter(function (it) {
+        return !q || String(it.number) === q || it.last4.indexOf(q) >= 0 || it.doctor.toLowerCase().indexOf(q) >= 0;
+      }).forEach(function (it) {
+        var tr = el('tr');
+        tr.className = it.late20 ? 'late20' : (it.late ? 'late' : '');
+        [[it.number, 'num'], [it.time], [it.shown], [it.doctor], [it.department], [it.last4], [it.arrived], [it.status]]
+          .forEach(function (c) { tr.appendChild(el('td', c[0], c[1])); });
+        tr.appendChild(el('td', it.late20 ? 'опоздание 20+ мин' : (it.late ? 'опаздывает' : ''), 'flag'));
+
+        var cell = el('td');
+        var box = el('div', undefined, 'actions');
+        if (it.pending && !it.arrived) box.appendChild(button('Пришёл', function () { act(it.token, 'arrived'); }));
+        box.appendChild(button('Перенёс', function () { openReschedule(it); }, true));
+        if (it.pending) {
+          box.appendChild(button('Отменил', function () {
+            if (confirm('Отменить приём № ' + it.number + '?')) act(it.token, 'cancel');
+          }, true));
+          box.appendChild(button('Не пришёл', function () { act(it.token, 'noshow'); }, true));
+        }
+        var sel = el('select');
+        sel.appendChild(el('option', 'Статус…'));
+        s.statuses.forEach(function (st) { var o = el('option', st); o.value = st; sel.appendChild(o); });
+        sel.onchange = function () { if (sel.value !== 'Статус…') act(it.token, 'status', sel.value); };
+        box.appendChild(sel);
+        cell.appendChild(box);
+        tr.appendChild(cell);
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Окно переноса: дата из календаря, время — только окна записи (решение Б2: пн–сб, 8.00–17.00).
+    var reschedToken = null;
+    function openReschedule(it) {
+      reschedToken = it.token;
+      document.getElementById('reschedWho').textContent = '№ ' + it.number + ' · ' + it.doctor + ' · сейчас ' + it.time;
+      var d = document.getElementById('reschedDate');
+      d.min = state.today;
+      d.value = state.today;
+      var t = document.getElementById('reschedTime');
+      t.textContent = '';
+      state.slots.forEach(function (s) { var o = el('option', s); o.value = s; t.appendChild(o); });
+      document.getElementById('reschedErr').textContent = '';
+      document.getElementById('resched').showModal();
+    }
+    document.getElementById('reschedCancel').onclick = function () { document.getElementById('resched').close(); };
+    document.getElementById('reschedOk').onclick = function () {
+      var d = document.getElementById('reschedDate').value;            // ГГГГ-ММ-ДД
+      var t = document.getElementById('reschedTime').value;            // ЧЧ:ММ
+      var err = document.getElementById('reschedErr');
+      if (!d) { err.textContent = 'Выбери дату.'; return; }
+      if (new Date(d + 'T00:00').getDay() === 0) { err.textContent = 'Воскресенье — клиника не работает.'; return; }
+      var p = d.split('-');
+      var text = p[2] + '.' + p[1] + '.' + p[0] + ' ' + t;
+      err.textContent = 'Переносим…';
+      run('registryAction', [KEY, reschedToken, 'reschedule', text]).then(function (s) {
+        document.getElementById('resched').close();
+        render(s);
+      }).catch(function (e) { err.textContent = e.message; });
+    };
+
+    document.getElementById('q').oninput = function () { if (state) render(state); };
+    function load() {
+      run('getRegistryView', [KEY]).then(render).catch(function (e) {
+        document.getElementById('rows').innerHTML = '';
+        var tr = el('tr'); var td = el('td', 'Не удалось загрузить: ' + e.message, 'muted'); td.colSpan = 10;
+        tr.appendChild(td); document.getElementById('rows').appendChild(tr);
+      });
+    }
+    load();
+    setInterval(load, 30000);
+  </script>
+</body>
+</html>

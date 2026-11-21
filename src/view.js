@@ -60,10 +60,15 @@ function buildPatientView_(appt, nowDate) {
     view.timeText = patientTime_(appt.shownLower) + '–' + patientTime_(appt.shownUpper);
     view.message = 'Сегодня приём у врача ' + appt.doctor + ' задерживается. Приходите к ' +
       patientTime_(appt.shownLower);
-    return view;
+  } else {
+    view.kind = 'today';
+    view.message = 'Ваш приём назначен на ' + patientTime_(at) + ', приходите вовремя';
   }
-  view.kind = 'today';
-  view.message = 'Ваш приём назначен на ' + patientTime_(at) + ', приходите вовремя';
+  // Опоздание (тест 20, решение Б10): и для пришедшего позже границы «вовремя», и для ещё не пришедшего.
+  if (isLateArrival_(appt) || isAbsentLate_(appt, nowDate)) {
+    view.kind = 'late';
+    view.message = lateMessage_(appt);
+  }
   return view;
 }
 

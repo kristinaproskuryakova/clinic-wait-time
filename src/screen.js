@@ -44,13 +44,14 @@ function screenItems_(appts, cabinets, n) {
       list.push({ at: a.at, number: a.number, timeText: 'Приём идёт', cabinet: cabinets[a.doctor], kind: view.kind });
       return;
     }
-    if (view.kind !== 'today' && view.kind !== 'delayed') return; // состоялся, отменён, неявка и т. п.
-    var interval = view.kind === 'delayed';
+    if (view.kind !== 'today' && view.kind !== 'delayed' && view.kind !== 'late') return; // состоялся, отменён…
+    if (isAbsentLate_(a, n)) return;                               // не пришёл к границе «вовремя» — убираем
+    var interval = isDate_(a.shownUpper) && isDate_(a.shownLower) && a.shownUpper > a.shownLower;
     var shownFrom = interval ? a.shownLower : a.at;                // что видит пациент: начало интервала или время
     if (shownFrom >= horizon) return;                              // дальше двух часов — не показываем
-    var upper = interval ? a.shownUpper : a.at;
-    if (addMin_(upper, CONFIG.LATE_GRACE_MIN) < n) return;         // уже опоздал — с экрана убираем
-    list.push({ at: a.at, number: a.number, timeText: view.timeText, cabinet: cabinets[a.doctor], kind: view.kind });
+    // Экран не показывает, что пациент опоздал: только его время (интервал или точное).
+    var kind = view.kind === 'late' ? (interval ? 'delayed' : 'today') : view.kind;
+    list.push({ at: a.at, number: a.number, timeText: view.timeText, cabinet: cabinets[a.doctor], kind: kind });
   });
   list.sort(function (x, y) {
     if ((x.kind === 'in_progress') !== (y.kind === 'in_progress')) return x.kind === 'in_progress' ? -1 : 1;

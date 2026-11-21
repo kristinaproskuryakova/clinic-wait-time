@@ -53,15 +53,21 @@ function recalc_(n) {
   var c = apptCol_;
   var lunch = doctorLunches_();
   var byDoctor = {};
+  var lateRefs = rows.map(function (r) { return [r[c('Опоздание от')]]; });
   rows.forEach(function (r, i) {
     var at = r[c('Дата и время приёма')];
     if (!isDate_(at) || daysBetween_(n, at) !== 0) return;
     var doc = r[c('Врач')];
+    var appt = apptFromRow_(r);
+    var absent = isAbsentLate_(appt, n);
+    if (absent && !isDate_(appt.lateRef)) lateRefs[i] = [lateRef_(appt)]; // граница прошла — фиксируем
     (byDoctor[doc] = byDoctor[doc] || []).push({
       key: i, at: at, duration: Number(r[c('Длительность, мин')]) || durationMin_(),
-      status: normalizeStatus_(r[c('Статус')]), startedAt: r[c('Начало')], endedAt: r[c('Окончание')],
+      status: appt.status, startedAt: r[c('Начало')], endedAt: r[c('Окончание')],
+      skip: absent,   // не пришёл к границе «вовремя» — место в прогнозе не занимает
     });
   });
+  sheet.getRange(2, c('Опоздание от') + 1, lateRefs.length, 1).setValues(lateRefs);
 
   var out = rows.map(function () { return ['', '', '']; }); // Прогноз, Ниж. (расчёт), Верх. (расчёт)
   Object.keys(byDoctor).forEach(function (doc) {

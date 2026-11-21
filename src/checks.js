@@ -12,7 +12,7 @@ function runChecks_() {
     check30_(bookings),
     check42_(appts),
     check43_(),
-  ].concat(forecastChecks_(), screenChecks_(appts));
+  ].concat(forecastChecks_(), screenChecks_(appts), lateChecks_(appts));
 }
 
 /** Этап 4: экраны отделений на живых данных таблицы (тесты 12, 13). */
@@ -179,6 +179,41 @@ function check43_() {
   return result_(43, 'Демо-время (функция времени)', errors.length ? false : 'частично',
     (errors.length ? 'Ошибки: ' + errors.join('; ') + '. ' : 'Разбор времени, ход часов и сдвиг +3 — верно. ') +
     'Сейчас: ' + formatDateTime_(now_()) + ' (' + mode + '). Кнопка «+3 минуты» и все модули — этап 3.');
+}
+
+/** Этап 5: опоздание (примеры) и закрытые статусы в конце дня (живые данные). */
+function lateChecks_(rows) {
+  var T = function (h, m) { return new Date(2026, 10, 21, h, m); };
+  var A = function (x) {
+    var a = { number: 1, doctor: 'Врач', department: 'Отд.', at: T(12, 0), status: STATUS.WAITING, startedAt: '',
+      shownLower: '', shownUpper: '', arrivedAt: '', lateRef: '' };
+    Object.keys(x || {}).forEach(function (k) { a[k] = x[k]; });
+    return a;
+  };
+  var out = [];
+  var ok19 = !isLateArrival_(A({ status: STATUS.ARRIVED, arrivedAt: T(12, 5) })) &&
+    !isLateArrival_(A({ status: STATUS.ARRIVED, arrivedAt: T(12, 24), shownLower: T(12, 10), shownUpper: T(12, 20) }));
+  out.push(result_(19, 'Пришёл до границы «вовремя» — опоздания нет', ok19,
+    'Приём 12.00, пришёл в 12.05; интервал 12.10–12.20, пришёл в 12.24 — оба вовремя.'));
+  var v1 = buildPatientView_(A({ status: STATUS.ARRIVED, arrivedAt: T(12, 6) }), T(12, 7));
+  var v2 = buildPatientView_(A(), T(12, 6));
+  out.push(result_(20, 'Пришёл позже — сообщение о возможном сокращении', v1.kind === 'late' && v2.kind === 'late' &&
+    v1.message.indexOf('Прием может быть сокращен') >= 0,
+    'Пришёл в 12.06 на 12.00 и не пришёл к 12.06 — оба видят текст об опоздании.'));
+  var ok46 = !isLate20_(A(), T(12, 19)) && isLate20_(A(), T(12, 20)) &&
+    isLate20_(A({ shownLower: T(12, 10), shownUpper: T(12, 20) }), T(12, 40));
+  out.push(result_(46, 'Опоздание 20+ минут подсвечено (часть «врач не ответил» — этап 6)', ok46 ? 'частично' : false,
+    'Подсветка с 12.20 для приёма в 12.00 и с 12.40 для интервала 12.10–12.20. На странице регистратуры смотришь ты.'));
+
+  var n = now_();
+  var openToday = rows.map(apptFromRow_).filter(function (a) {
+    return isDate_(a.at) && daysBetween_(n, a.at) === 0 && (isPending_(a) || a.status === STATUS.IN_PROGRESS);
+  }).length;
+  var closedNow = n.getHours() * 60 + n.getMinutes() >= minutesOf_(closeTime_());
+  out.push(result_(26, 'К концу дня все приёмы закрыты', closedNow ? openToday === 0 : 'частично',
+    closedNow ? 'Рабочий день закончился. Незакрытых приёмов сегодня: ' + openToday + '.'
+      : 'Рабочий день ещё идёт. Незакрытых приёмов сейчас: ' + openToday + '. Проверь после ' + closeTime_() + '.'));
+  return out;
 }
 
 function result_(num, title, ok, details) {

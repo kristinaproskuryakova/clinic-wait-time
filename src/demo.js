@@ -88,6 +88,7 @@ function createDemoDay_() {
   return 'Готово: врачей ' + DEMO_DOCTORS.length + ', записей ' + bookings.length +
     ', приёмов ' + created + '. Уже прошли по расписанию («состоялся»): ' + closed.done +
     (closed.going ? ', идут сейчас: ' + closed.going : '') +
+    (closed.arrived ? ', уже пришли: ' + closed.arrived : '') +
     '. Сегодня по демо-времени: ' + formatDateTime_(n) + '.';
 }
 
@@ -153,14 +154,25 @@ function closePastDemoAppointments_(n) {
   var sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.APPOINTMENTS);
   var rows = readRows_(SHEETS.APPOINTMENTS);
   var c = apptCol_;
-  var res = { done: 0, going: 0 };
+  var res = { done: 0, going: 0, arrived: 0 };
   if (!rows.length) return res;
   // Меняем значения в памяти и записываем столбцы целиком — так быстрее, чем по строке.
   var times = rows.map(function (r) { return [r[c('Начало')], r[c('Окончание')]]; });
   var statuses = rows.map(function (r) { return [r[c('Статус')]]; });
+  var arrivals = rows.map(function (r) { return [r[c('Пришёл')]]; });
   rows.forEach(function (r, i) {
     var at = r[c('Дата и время приёма')];
-    if (!isDate_(at) || daysBetween_(n, at) !== 0 || at > n) return;
+    if (!isDate_(at) || daysBetween_(n, at) !== 0) return;
+    if (at > n) {
+      // Пациенты ближайших 15 минут уже пришли (за 15 минут до приёма).
+      if (addMin_(at, -CONFIG.DEMO_ARRIVE_BEFORE_MIN) <= n) {
+        arrivals[i] = [addMin_(at, -CONFIG.DEMO_ARRIVE_BEFORE_MIN)];
+        statuses[i] = [STATUS.ARRIVED];
+        res.arrived++;
+      }
+      return;
+    }
+    arrivals[i] = [addMin_(at, -CONFIG.DEMO_ARRIVE_BEFORE_MIN)];
     var end = addMin_(at, Number(r[c('Длительность, мин')]) || durationMin_());
     if (end <= n) {
       times[i] = [at, end];
@@ -174,7 +186,31 @@ function closePastDemoAppointments_(n) {
   });
   sheet.getRange(2, c('Начало') + 1, rows.length, 2).setValues(times);
   sheet.getRange(2, c('Статус') + 1, rows.length, 1).setValues(statuses);
+  sheet.getRange(2, c('Пришёл') + 1, rows.length, 1).setValues(arrivals);
   return res;
+}
+
+/**
+ * Демо (кнопка пульта «Отметить приход»): все, кого ещё ждут и чьё показанное время наступит
+ * в ближайшие 15 минут, «пришли» сейчас. Опоздавшие (прошла граница «вовремя») не трогаются.
+ */
+function demoArrivals_(n) {
+  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.APPOINTMENTS);
+  var rows = readRows_(SHEETS.APPOINTMENTS);
+  var c = apptCol_;
+  var count = 0;
+  rows.forEach(function (r, i) {
+    var a = apptFromRow_(r);
+    if (!isDate_(a.at) || daysBetween_(n, a.at) !== 0 || !isPending_(a) || isDate_(a.arrivedAt)) return;
+    if (isAbsentLate_(a, n)) return;
+    var from = isDate_(a.shownLower) && a.shownUpper > a.shownLower ? a.shownLower : a.at;
+    if (addMin_(from, -CONFIG.DEMO_ARRIVE_BEFORE_MIN) > n) return;
+    sheet.getRange(i + 2, c('Пришёл') + 1).setValue(n);
+    sheet.getRange(i + 2, c('Опоздание от') + 1).setValue(lateRef_(a));
+    sheet.getRange(i + 2, c('Статус') + 1).setValue(STATUS.ARRIVED);
+    count++;
+  });
+  return count;
 }
 
 // ---------- внутреннее ----------

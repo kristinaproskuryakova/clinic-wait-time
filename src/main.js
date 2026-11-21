@@ -4,6 +4,7 @@
  *  - ?page=reschedule&t=ТОКЕН       → страница-заглушка «Перенести или отменить»;
  *  - ?screen=ОТДЕЛЕНИЕ              → экран отделения (табло);
  *  - ?page=pult&key=…               → служебная страница «Пульт»;
+ *  - ?page=registry&key=…           → служебная страница «Регистратура»;
  *  - ?page=checks&key=…             → служебная страница «Проверки» (только с правильным ключом);
  *  - без параметров                 → проверочная страница «Работает».
  */
@@ -17,6 +18,12 @@ function doGet(e) {
     c.results = runChecks_();
     c.nowText = formatDateTime_(now_());
     return page_(c.evaluate(), 'Проверки');
+  }
+  if (p.page === 'registry') {
+    if (!isStaffKey_(p.key)) return page_(HtmlService.createHtmlOutput('<p style="font-family:sans-serif">Нет доступа.</p>'), 'Нет доступа');
+    var g = HtmlService.createTemplateFromFile('registry_page');
+    g.key = p.key;
+    return page_(g.evaluate(), 'Регистратура');
   }
   if (p.page === 'pult') {
     if (!isStaffKey_(p.key)) return page_(HtmlService.createHtmlOutput('<p style="font-family:sans-serif">Нет доступа.</p>'), 'Нет доступа');

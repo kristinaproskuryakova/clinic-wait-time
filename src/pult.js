@@ -12,7 +12,11 @@ function pultAction(key, action) {
     if (action === 'cycle') { recalc_(n); publish_(n); }
     if (action === 'failOn') setFailureSimulated_(true);
     if (action === 'failOff') { setFailureSimulated_(false); recalc_(n); publish_(n); }
-    return pultState_();
+    var arrived = null;
+    if (action === 'arrivals') { arrived = demoArrivals_(n); recalc_(n); publish_(n); }
+    var st = pultState_();
+    if (arrived !== null) st.message = 'Отмечено «пришёл»: ' + arrived;
+    return st;
   } finally {
     lock.releaseLock();
   }

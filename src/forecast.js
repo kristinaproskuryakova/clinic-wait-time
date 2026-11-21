@@ -12,7 +12,8 @@ function forecastDoctorDay_(appts, lunchStartMin, now) {
   var MIN = 60000;
   now = new Date(Math.floor(now.getTime() / MIN) * MIN); // считаем по целым минутам
   var list = appts.filter(function (a) {
-    return a.status !== STATUS.CANCELLED && a.status !== STATUS.NO_SHOW;
+    // Отменённые, неявки и не пришедшие к границе «вовремя» место в цепочке не занимают.
+    return a.status !== STATUS.CANCELLED && a.status !== STATUS.NO_SHOW && !a.skip;
   }).sort(function (a, b) { return a.at - b.at; });
 
   var result = {};

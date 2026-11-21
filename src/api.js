@@ -26,7 +26,7 @@ function getPatientView(token, deviceId) {
   var n = now_();
   var view = buildPatientView_(appt, n);
   // Заглушка (тест 34): для сегодняшнего приёма, если публикации не было STALE_MIN минут.
-  var stale = (view.kind === 'today' || view.kind === 'delayed') && isStale_(n);
+  var stale = (view.kind === 'today' || view.kind === 'delayed' || view.kind === 'late') && isStale_(n);
   return { state: 'ok', view: view, stale: stale, refreshSec: CONFIG.PAGE_REFRESH_SEC };
 }
 
@@ -51,5 +51,7 @@ function apptFromRow_(r) {
     startedAt: r[c('Начало')],
     shownLower: r[c('Ниж. (показ)')],   // опубликованный интервал (этап 3)
     shownUpper: r[c('Верх. (показ)')],
+    arrivedAt: r[c('Пришёл')],          // отметка регистратуры (этап 5)
+    lateRef: r[c('Опоздание от')],
   };
 }

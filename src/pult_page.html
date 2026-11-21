@@ -30,7 +30,9 @@
     <div class="row" style="margin-top:12px">
       <button id="plus3">+3 минуты</button>
       <button id="cycle" class="secondary">Пересчитать и опубликовать</button>
+      <button id="arrivals" class="secondary">Демо: отметить приход (ближайшие 15 мин)</button>
     </div>
+    <p class="muted" id="msg"></p>
   </div>
   <div class="card">
     <dl>
@@ -61,6 +63,7 @@
     function render(s) {
       state = s;
       set('mode', s.demo ? 'Демо-время' : 'Настоящие часы');
+      set('msg', s.message || '');
       set('now', s.now);
       set('published', s.publishedAt + (s.minutesSincePublish !== null ? ' (' + s.minutesSincePublish + ' мин назад)' : ''));
       set('stale', s.stale ? 'заглушка (нет публикаций 6 минут)' : 'данные свежие', s.stale ? 'bad' : 'ok');
@@ -71,6 +74,7 @@
     }
     document.getElementById('plus3').onclick = function () { call('plus3'); };
     document.getElementById('cycle').onclick = function () { call('cycle'); };
+    document.getElementById('arrivals').onclick = function () { call('arrivals'); };
     document.getElementById('failToggle').onclick = function () { call(state && state.failure ? 'failOff' : 'failOn'); };
     call('state');
     setInterval(function () { call('state'); }, 30000);

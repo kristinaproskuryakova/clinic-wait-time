@@ -31,6 +31,7 @@ function staffUrl_(page) {
 function menuShowStaffLinks() {
   var ui = SpreadsheetApp.getUi();
   var links = [
+    ['Регистратура', staffUrl_('registry')],
     ['Пульт (демо-время, +3 минуты, сбой)', staffUrl_('pult')],
     ['Проверки (тесты по номерам)', staffUrl_('checks')],
   ].concat(departments_().map(function (dep) { return ['Экран: ' + dep, screenUrl_(dep)]; }));
@@ -40,7 +41,7 @@ function menuShowStaffLinks() {
       return '<p><b>' + l[0] + '</b><br><a href="' + l[1] + '" target="_blank">открыть</a></p>';
     }).join('') + '</div>';
   ui.showModalDialog(
-    HtmlService.createHtmlOutput(html).setWidth(420).setHeight(420), 'Служебные ссылки');
+    HtmlService.createHtmlOutput(html).setWidth(420).setHeight(480), 'Служебные ссылки');
 }
 
 /**
