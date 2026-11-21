@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    /* Табло в отделении: тёмный фон, крупные цифры, читается издалека. Тема всегда тёмная. */
+    :root { --bg:#0e1116; --panel:#161b22; --line:#27303a; --text:#f0f3f6; --muted:#8b97a3;
+            --warn:#f0b35a; --go:#56d364; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; height:100%; }
+    body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+           display:flex; flex-direction:column; padding:clamp(10px, 2.5vh, 32px) clamp(12px, 3vw, 32px); gap:clamp(6px, 1.6vh, 24px); }
+    header { display:flex; justify-content:space-between; align-items:baseline; gap:16px; }
+    h1 { margin:0; font-size:clamp(22px, min(4.5vw, 5vh), 56px); }
+    .clock { font-size:clamp(20px, min(4vw, 4.5vh), 48px); font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; }
+    table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+    th { text-align:left; color:var(--muted); font-weight:600; font-size:clamp(12px, min(2vw, 2.2vh), 24px);
+         padding:0 12px 6px; border-bottom:2px solid var(--line); }
+    /* Размер строк зависит и от ширины, и от высоты экрана: до 10 строк (два часа) помещаются без прокрутки. */
+    td { padding:clamp(3px, 0.9vh, 14px) 12px; border-bottom:1px solid var(--line);
+         font-size:clamp(18px, min(4.6vw, 4.6vh), 54px); font-weight:800; }
+    td.cab { color:var(--muted); font-weight:700; }
+    tr.delayed td.time { color:var(--warn); }
+    tr.in_progress td.time { color:var(--go); font-size:clamp(16px, min(3.4vw, 3.4vh), 40px); }
+    .note { margin:auto; text-align:center; max-width:900px; font-size:clamp(20px, 4vw, 40px); color:var(--muted); line-height:1.35; }
+    body.off { background:#000; }
+    body.off .note { color:#3a3f45; font-size:clamp(14px, 2vw, 20px); }
+    [hidden] { display:none !important; }
+  </style>
+</head>
+<body>
+  <header id="head">
+    <h1 id="title"><?= department ?></h1>
+    <div class="clock" id="clock"></div>
+  </header>
+  <table id="list" hidden>
+    <thead><tr><th>Номер</th><th>Время</th><th>Кабинет</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="note" id="note">Загружаем очередь…</div>
+
+  <?!= include_('api_client'); ?>
+  <script>
+    var DEPARTMENT = <?!= JSON.stringify(department) ?>;
+    // Та же заглушка, что на странице пациента (тест 34), хранится в самой странице.
+    var STUB = 'Информация об очереди временно недоступна. Ваша запись сохраняется, приходите ко времени, указанному в SMS';
+    var STALE_MS = <?!= JSON.stringify(staleMin) ?> * 60000;
+    var lastOk = performance.now();
+    var loadedOnce = false;
+
+    function note(text, off) {
+      document.body.className = off ? 'off' : '';
+      document.getElementById('head').hidden = !!off;
+      document.getElementById('list').hidden = true;
+      var n = document.getElementById('note');
+      n.hidden = false;
+      n.textContent = text;
+    }
+
+    function render(res) {
+      if (res.state === 'unknown') return note('Такого отделения нет.');
+      if (res.state === 'closed') return note('Экран выключен: клиника закрыта.', true); // тест 35
+      if (res.state === 'stale') return note(STUB);
+      document.body.className = '';
+      document.getElementById('head').hidden = false;
+      document.getElementById('clock').textContent = res.clock;
+      if (!res.items.length) return note('В ближайшие два часа приёмов нет.');
+      var tbody = document.getElementById('rows');
+      tbody.textContent = '';
+      res.items.forEach(function (it) {
+        var tr = document.createElement('tr');
+        tr.className = it.kind;
+        [[it.number, ''], [it.timeText, 'time'], [it.cabinet, 'cab']].forEach(function (c) {
+          var td = document.createElement('td');
+          td.textContent = c[0];
+          td.className = c[1];
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      document.getElementById('note').hidden = true;
+      document.getElementById('list').hidden = false;
+    }
+
+    function load() {
+      Api.getScreenView(DEPARTMENT).then(function (res) {
+        lastOk = performance.now();
+        loadedOnce = true;
+        render(res);
+        setTimeout(load, (res.refreshSec || 60) * 1000);
+      }).catch(function (e) {
+        if (!loadedOnce) note('Не удалось загрузить очередь: ' + (e && e.message ? e.message : 'ошибка сервера') + '. Повторим через минуту.');
+        else if (performance.now() - lastOk >= STALE_MS) note(STUB);
+        setTimeout(load, 60000);
+      });
+    }
+    load();
+  </script>
+</body>
+</html>

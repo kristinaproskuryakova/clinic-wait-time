@@ -12,7 +12,47 @@ function runChecks_() {
     check30_(bookings),
     check42_(appts),
     check43_(),
-  ].concat(forecastChecks_());
+  ].concat(forecastChecks_(), screenChecks_(appts));
+}
+
+/** Этап 4: экраны отделений на живых данных таблицы (тесты 12, 13). */
+function screenChecks_(rows) {
+  var n = now_();
+  var appts = rows.map(apptFromRow_);
+  var doctors = readRows_(SHEETS.DOCTORS);
+  var horizon = addMin_(n, CONFIG.SCREEN_HORIZON_MIN);
+  var shown = 0, far = 0, mismatch = 0, farToday = 0;
+  departments_().forEach(function (dep) {
+    var cabinets = {};
+    doctors.forEach(function (d) { if (d[1] === dep) cabinets[d[0]] = String(d[2]); });
+    var items = screenItems_(appts, cabinets, n);
+    shown += items.length;
+    items.forEach(function (it) {
+      var a = appts.filter(function (x) { return x.number === it.number && x.doctor in cabinets; })[0];
+      if (!a) { mismatch++; return; }
+      var shownFrom = it.kind === 'delayed' ? a.shownLower : a.at;
+      if (it.kind !== 'in_progress' && shownFrom >= horizon) far++;
+      var pageTime = buildPatientView_(a, n);
+      var same = it.kind === 'in_progress' ? pageTime.kind === 'in_progress' : pageTime.timeText === it.timeText;
+      if (!same) mismatch++;
+    });
+  });
+  appts.forEach(function (a) {
+    if (!isDate_(a.at) || daysBetween_(n, a.at) !== 0) return;
+    var v = buildPatientView_(a, n);
+    var from = v.kind === 'delayed' ? a.shownLower : a.at;
+    if ((v.kind === 'today' || v.kind === 'delayed') && from >= horizon) farToday++;
+  });
+  var working = isWorkingTime_(n);
+  return [
+    result_(12, 'Экран: только ближайшие ' + (CONFIG.SCREEN_HORIZON_MIN / 60) + ' ч', !working ? 'частично' : far === 0,
+      (working ? 'На экранах сейчас приёмов: ' + shown + ', дальше горизонта: ' + far +
+        '. Сегодняшних приёмов с показанным временем дальше горизонта (на экран не попали): ' + farToday + '.'
+        : 'Клиника закрыта по текущему времени — экраны выключены. Впиши демо-время в часы работы.')),
+    result_(13, 'Экран и страница показывают одно время', !working ? 'частично' : mismatch === 0 && shown > 0,
+      working ? 'Сравнено приёмов: ' + shown + ', расхождений: ' + mismatch + '. Время для экрана и страницы считает одна функция из одной публикации.'
+        : 'Клиника закрыта — сравнивать нечего.'),
+  ];
 }
 
 /**

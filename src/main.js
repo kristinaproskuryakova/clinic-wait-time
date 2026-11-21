@@ -2,6 +2,8 @@
  * Вход в веб-приложение: Google вызывает doGet, когда открывают ссылку.
  *  - ?t=ТОКЕН                       → страница пациента;
  *  - ?page=reschedule&t=ТОКЕН       → страница-заглушка «Перенести или отменить»;
+ *  - ?screen=ОТДЕЛЕНИЕ              → экран отделения (табло);
+ *  - ?page=pult&key=…               → служебная страница «Пульт»;
  *  - ?page=checks&key=…             → служебная страница «Проверки» (только с правильным ключом);
  *  - без параметров                 → проверочная страница «Работает».
  */
@@ -26,6 +28,18 @@ function doGet(e) {
     var r = HtmlService.createTemplateFromFile('reschedule_page');
     r.backUrl = token ? CONFIG.WEB_APP_URL + '?t=' + token : '';
     return page_(r.evaluate(), 'Перенести или отменить приём');
+  }
+  if (p.api === 'screen') {
+    // Данные экрана в виде JSON (на экране нет личных данных). Пригодится и при переезде на GitHub Pages.
+    var out;
+    try { out = getScreenView(String(p.d || '')); } catch (err) { out = { state: 'error', message: err.message }; }
+    return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+  }
+  if (p.screen !== undefined) {
+    var s = HtmlService.createTemplateFromFile('screen_page');
+    s.department = String(p.screen).slice(0, 60);
+    s.staleMin = CONFIG.STALE_MIN;
+    return page_(s.evaluate(), 'Экран: ' + s.department);
   }
   if (p.t !== undefined) {
     var t = HtmlService.createTemplateFromFile('patient_page');

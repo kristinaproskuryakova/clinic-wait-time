@@ -81,8 +81,14 @@ function createDemoDay_() {
   var sheet = ss.getSheetByName(SHEETS.BOOKINGS);
   sheet.getRange(2, 1, bookings.length, bookings[0].length).setValues(bookings);
   var created = syncFromBookings_();
+  var closed = closePastDemoAppointments_(now_());
+  var n = now_();
+  recalc_(n);
+  publish_(n);
   return 'Готово: врачей ' + DEMO_DOCTORS.length + ', записей ' + bookings.length +
-    ', приёмов ' + created + '. Сегодня по демо-времени: ' + formatDateTime_(now_()).slice(0, 10) + '.';
+    ', приёмов ' + created + '. Уже прошли по расписанию («состоялся»): ' + closed.done +
+    (closed.going ? ', идут сейчас: ' + closed.going : '') +
+    '. Сегодня по демо-времени: ' + formatDateTime_(n) + '.';
 }
 
 /**
@@ -136,6 +142,39 @@ function demoDelay_(doctor, delayMin) {
   publish_(n);
   return 'Врач ' + doctor + ': «состоялся» с опозданием ' + delayMin + ' мин — ' + done + ' приём(ов)' +
     (going ? ', «идёт» — приём на ' + going : '') + '. Прогноз пересчитан и опубликован (' + formatTime_(n) + ').';
+}
+
+/**
+ * Демо-день создан посреди дня: приёмы, которые по расписанию уже закончились, отмечаем «состоялся»
+ * (начало и окончание — по расписанию), а тот, что идёт сейчас, — «идёт».
+ * Иначе утренние «ожидается» встали бы в очередь после «сейчас» (отметок врача до этапа 6 нет).
+ */
+function closePastDemoAppointments_(n) {
+  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.APPOINTMENTS);
+  var rows = readRows_(SHEETS.APPOINTMENTS);
+  var c = apptCol_;
+  var res = { done: 0, going: 0 };
+  if (!rows.length) return res;
+  // Меняем значения в памяти и записываем столбцы целиком — так быстрее, чем по строке.
+  var times = rows.map(function (r) { return [r[c('Начало')], r[c('Окончание')]]; });
+  var statuses = rows.map(function (r) { return [r[c('Статус')]]; });
+  rows.forEach(function (r, i) {
+    var at = r[c('Дата и время приёма')];
+    if (!isDate_(at) || daysBetween_(n, at) !== 0 || at > n) return;
+    var end = addMin_(at, Number(r[c('Длительность, мин')]) || durationMin_());
+    if (end <= n) {
+      times[i] = [at, end];
+      statuses[i] = [STATUS.DONE];
+      res.done++;
+    } else {
+      times[i] = [at, ''];
+      statuses[i] = [STATUS.IN_PROGRESS];
+      res.going++;
+    }
+  });
+  sheet.getRange(2, c('Начало') + 1, rows.length, 2).setValues(times);
+  sheet.getRange(2, c('Статус') + 1, rows.length, 1).setValues(statuses);
+  return res;
 }
 
 // ---------- внутреннее ----------

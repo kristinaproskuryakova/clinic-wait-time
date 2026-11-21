@@ -13,6 +13,14 @@
           .getPatientView(token, deviceId);
       });
     },
+    getScreenView: function (department) {
+      return new Promise(function (resolve, reject) {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .getScreenView(department);
+      });
+    },
   };
 
   /** Метка этого браузера для подсчёта неверных попыток (тест 31). Хранится в браузере. */

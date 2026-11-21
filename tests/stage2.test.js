@@ -96,8 +96,8 @@ test('правильный токен → данные приёма; мусор 
 
 test('внутренние функции закрыты от вызова со страницы', () => {
   // Открытые: точки входа Google (doGet, onOpen, onEdit, onTimer), пункты меню (работают только из таблицы),
-  // getPatientView (отдаёт один приём по токену) и pultAction (без ключа служебных страниц не работает).
-  const allowed = ['doGet', 'onOpen', 'onEdit', 'onTimer', 'setupSheets', 'getPatientView', 'pultAction',
+  // getPatientView (отдаёт один приём по токену), getScreenView (экран: номера и время, без личных данных) и pultAction (без ключа служебных страниц не работает).
+  const allowed = ['doGet', 'onOpen', 'onEdit', 'onTimer', 'setupSheets', 'getPatientView', 'getScreenView', 'pultAction',
     'menuCreateDemoDay', 'menuSyncFromBookings', 'menuShowStaffLinks', 'menuShowPatientLink',
     'menuDemoDelay', 'menuInstallTimer'];
   const fresh = loadSrc();
