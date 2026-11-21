@@ -48,7 +48,7 @@ function formatSheets_() {
       'Начало': 'HH:mm', 'Окончание': 'HH:mm', 'Прогноз': 'HH:mm',
       'Ниж. (расчёт)': 'HH:mm', 'Верх. (расчёт)': 'HH:mm', 'Ниж. (показ)': 'HH:mm', 'Верх. (показ)': 'HH:mm',
       'Опоздание от': 'HH:mm', 'Карта открыта': 'HH:mm', 'Карта закрыта': 'HH:mm' },
-    'Журнал SMS': { 'Отправлено': dateTime },
+    'Журнал SMS': { 'Отправлено': dateTime, 'Приём на': dateTime },
   };
   Object.keys(formats).forEach(function (name) {
     var sheet = ss.getSheetByName(name);

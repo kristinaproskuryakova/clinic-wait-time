@@ -15,7 +15,9 @@ function onTimer() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return;
   try {
-    runCycleSteps_(now_());
+    var n = now_();
+    runCycleSteps_(n);
+    smsStep_(n);
   } finally {
     lock.releaseLock();
   }
@@ -42,6 +44,7 @@ function plusThreeMinutes_() {
   var n = addDemoMinutes_(CONFIG.CYCLE_MIN);
   recalc_(n);
   publish_(n);
+  smsStep_(n);
   return n;
 }
 
@@ -64,6 +67,7 @@ function recalc_(n) {
     (byDoctor[doc] = byDoctor[doc] || []).push({
       key: i, at: at, duration: Number(r[c('Длительность, мин')]) || durationMin_(),
       status: appt.status, startedAt: r[c('Начало')], endedAt: r[c('Окончание')],
+      arrivedAt: appt.arrivedAt,
       skip: absent,   // не пришёл к границе «вовремя» — место в прогнозе не занимает
     });
   });

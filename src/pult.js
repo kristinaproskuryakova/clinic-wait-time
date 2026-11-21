@@ -9,7 +9,7 @@ function pultAction(key, action) {
   try {
     var n = now_();
     if (action === 'plus3') n = plusThreeMinutes_();
-    if (action === 'cycle') { recalc_(n); publish_(n); }
+    if (action === 'cycle') { recalc_(n); publish_(n); smsStep_(n); }
     if (action === 'failOn') setFailureSimulated_(true);
     if (action === 'failOff') { setFailureSimulated_(false); recalc_(n); publish_(n); }
     var arrived = null;

@@ -44,6 +44,7 @@ function registryAction(key, token, action, payload) {
       var problem = rescheduleProblem_(d, n);
       if (problem) throw new Error(problem);
       rescheduleAppointment_(token, d);
+      sendConfirmation_(token, n);   // новое подтверждение; напоминания пойдут по новой дате
     } else if (action === 'answerStart' || action === 'answerEnd') {
       // Ответ регистратуры за врача (решения Б7, Б20): «вовремя» = время показа окна врачу, иначе время с шагом 5 минут.
       var ctx = doctorContext_(appt.doctor, n);

@@ -87,6 +87,14 @@ function syncFromBookings_() {
     var sheet = SpreadsheetApp.getActive().getSheetByName(SHEETS.APPOINTMENTS);
     sheet.getRange(sheet.getLastRow() + 1, 1, fresh.length, fresh[0].length).setValues(fresh);
     formatSheets_();
+    // Подтверждение записи (тест 15): уходит в момент создания записи.
+    var created = {};
+    bookings.forEach(function (b) { created[b[0]] = b[5]; });
+    var n = now_();
+    sendConfirmations_(fresh.map(function (row) {
+      var at = created[row[0]];
+      return { token: row[0], sentAt: isDate_(at) && at <= n ? at : n };
+    }));
   }
   return fresh.length;
 }

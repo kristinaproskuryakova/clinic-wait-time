@@ -43,6 +43,16 @@ function isLate20_(a, n) {
   return isPending_(a) && !isDate_(a.arrivedAt) && n >= addMin_(lateRef_(a), CONFIG.LATE_SMS_MIN);
 }
 
+/**
+ * Пора SMS об опоздании (тест 21): прошло 20+ минут от опорного времени. SMS уходит, даже если пациент
+ * отметился в эту же минуту или позже — пришёл после 20-минутной границы.
+ */
+function isLateSmsDue_(a, n) {
+  var mark = addMin_(lateRef_(a), CONFIG.LATE_SMS_MIN);
+  if (!isPending_(a) || n < mark) return false;
+  return !isDate_(a.arrivedAt) || a.arrivedAt >= mark;
+}
+
 /** Текст об опоздании для страницы пациента (решение Б10). */
 function lateMessage_(a) {
   return 'Похоже, вы опаздываете на прием к врачу ' + a.doctor + ', назначенный на ' +

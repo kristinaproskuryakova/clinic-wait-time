@@ -83,12 +83,14 @@ function createDemoDay_() {
   var created = syncFromBookings_();
   var closed = closePastDemoAppointments_(now_());
   var n = now_();
+  var reminders = backfillReminders_(n);
   recalc_(n);
   publish_(n);
   return 'Готово: врачей ' + DEMO_DOCTORS.length + ', записей ' + bookings.length +
     ', приёмов ' + created + '. Уже прошли по расписанию («состоялся»): ' + closed.done +
     (closed.going ? ', идут сейчас: ' + closed.going : '') +
     (closed.arrived ? ', уже пришли: ' + closed.arrived : '') +
+    '. SMS в журнале: подтверждения ' + created + ', напоминания ' + reminders +
     '. Сегодня по демо-времени: ' + formatDateTime_(n) + '.';
 }
 

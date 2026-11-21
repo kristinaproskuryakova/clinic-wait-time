@@ -86,3 +86,19 @@ test('перенос: окна записи 8.00–16.30 и запреты (пр
   assert.match(h.rescheduleProblem_(new Date(2026, 10, 23, 17, 0), now), /вне часов/);
   assert.match(h.rescheduleProblem_(null, now), /Выбери/);
 });
+
+test('случай из демо: врач свободен с 16.25, пациент на 16.30 не пришёл, в 16.53 — опоздание 20+', () => {
+  const P = (key, hh, mm, extra) => Object.assign({ key, at: T(hh, mm), duration: 25, status: 'ожидается', startedAt: '', endedAt: '' }, extra || {});
+  const res = g.forecastDoctorDay_([
+    P('p', 16, 0, { status: 'состоялся', startedAt: T(16, 0), endedAt: T(16, 25) }),
+    P('a', 16, 30),
+  ], null, T(16, 53));
+  assert.strictEqual(res.a.forecast.getTime(), T(16, 30).getTime(), 'время не пришедшего не едет за часами');
+  assert.strictEqual(res.a.upper.getTime(), T(16, 30).getTime(), 'показывается точное 16.30');
+  const a = A({ at: T(16, 30), shownLower: res.a.lower, shownUpper: res.a.upper });
+  assert.strictEqual(g.isAbsentLate_(a, T(16, 36)), true, 'с 16.36 — опаздывает');
+  assert.strictEqual(g.isLate20_(a, T(16, 50)), true, 'с 16.50 — красная подсветка');
+  const arrived = P('b', 16, 30, { arrivedAt: T(16, 29) });
+  const res2 = g.forecastDoctorDay_([P('p', 16, 0, { status: 'состоялся', startedAt: T(16, 0), endedAt: T(16, 25) }), arrived], null, T(16, 40));
+  assert.strictEqual(res2.b.forecast.getTime(), T(16, 40).getTime(), 'пришедшего примут не раньше, чем сейчас');
+});

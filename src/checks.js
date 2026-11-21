@@ -12,7 +12,7 @@ function runChecks_() {
     check30_(bookings),
     check42_(appts),
     check43_(),
-  ].concat(forecastChecks_(), screenChecks_(appts), lateChecks_(appts), doctorChecks_());
+  ].concat(forecastChecks_(), screenChecks_(appts), lateChecks_(appts), doctorChecks_(), smsChecks_(appts));
 }
 
 /** Этап 4: экраны отделений на живых данных таблицы (тесты 12, 13). */
@@ -279,6 +279,67 @@ function doctorChecks_() {
     try { got = k[2](); } catch (e) { got = 'ошибка: ' + e.message; }
     return result_(k[0], k[1], got === k[3], 'Ожидается: ' + k[3] + '. Получено: ' + got + '.');
   });
+}
+
+/** Этап 7: SMS — правила на примерах (15–18, 21) и живой журнал (42, 44). */
+function smsChecks_(apptRows) {
+  var D = function (d, h, m) { return new Date(2026, 10, d, h || 0, m || 0); };
+  var A = function (token, h, m, x) {
+    var a = { token: token, number: 47, doctor: 'Врач', department: 'Отд.', at: D(21, h, m), duration: 25,
+      status: STATUS.WAITING, arrivedAt: '', startedAt: '', endedAt: '', lateRef: '', shownLower: '', shownUpper: '',
+      cardOpenedAt: '', cardClosedAt: '', createdAt: D(14, 9) };
+    Object.keys(x || {}).forEach(function (k) { a[k] = x[k]; });
+    return a;
+  };
+  var plan = function (c, at) { return smsReminderPlan_(c, at).map(function (r) { return r.type.replace('напоминание ', ''); }).join('+') || 'нет'; };
+  var types = function (list, n) { return dueSms_(list, n).map(function (d) { return d.token + ':' + d.type; }).sort().join(', ') || 'нет'; };
+  var lateDone = function (k, h) { return A(k, h, 0, { status: STATUS.DONE, arrivedAt: D(21, h - 1, 55), startedAt: D(21, h, 20), endedAt: D(21, h, 45) }); };
+  var delayDay = [lateDone('d1', 9), lateDone('d2', 10), lateDone('d3', 11), A('nx', 12, 0, { shownLower: D(21, 12, 20), shownUpper: D(21, 12, 30) })];
+  var cases = [
+    [15, 'Напоминания: день в день / за 1 / за 2 / за 3 / за 4 дня', function () {
+      var at = D(25, 10, 0);
+      return [plan(D(25, 8), at), plan(D(24, 12), at), plan(D(23, 12), at), plan(D(22, 9), at), plan(D(21, 9), at)].join(' / '); },
+      'нет / нет / за 1 день / за 1 день / за 3 дня+за 1 день'],
+    [16, 'Без задержки SMS о задержке нет', function () { return types([A('a', 13, 0)], D(21, 12, 0)); }, 'нет'],
+    [17, 'При задержке — тем, у кого до приёма 30–120 минут', function () {
+      return types(delayDay.concat([A('m25', 12, 15), A('m30', 12, 20), A('m120', 13, 50), A('m125', 13, 55)]), D(21, 11, 50))
+        .split(', ').filter(function (x) { return x.indexOf('задержка') > 0; }).join(', '); }, 'm120:задержка, m30:задержка'],
+    [18, 'Одно SMS о задержке на приём (ключ журнала)', function () {
+      return String(smsKey_('X', SMS.DELAY, D(21, 12)) === smsKey_('X', SMS.DELAY, D(21, 12))) + ' / ' +
+        String(smsKey_('X', SMS.DELAY, D(21, 12)) === smsKey_('X', SMS.DELAY, D(25, 10))); }, 'true / false'],
+    [21, 'Опоздание 20+ минут — SMS, даже если входит в эту минуту', function () {
+      return [types([A('a', 12, 0)], D(21, 12, 19)), types([A('a', 12, 0)], D(21, 12, 20)),
+        types([A('a', 12, 0, { status: STATUS.ARRIVED, arrivedAt: D(21, 12, 20) })], D(21, 12, 20))].join(' / '); },
+      'нет / a:опоздание / a:опоздание'],
+  ];
+  var out = cases.map(function (k) {
+    var got;
+    try { got = k[2](); } catch (e) { got = 'ошибка: ' + e.message; }
+    return result_(k[0], k[1], got === k[3], 'Ожидается: ' + k[3] + '. Получено: ' + got + '.');
+  });
+
+  // Живой журнал.
+  var log = readRows_(SHEETS.SMS_LOG);
+  var phones = readRows_(SHEETS.BOOKINGS).map(function (b) { return String(b[7]).replace(/\D/g, ''); }).filter(String);
+  var numbers = {};
+  apptRows.forEach(function (r) { numbers[r[apptCol_('Токен')]] = r[apptCol_('Номер')]; });
+  var incomplete = 0, withPhone = 0, wrongNumber = 0, checkedNumbers = 0;
+  log.forEach(function (r) {
+    if (!r[0] || !r[1] || !r[2] || !r[3] || !isDate_(r[4])) incomplete++;
+    var digits = String(r[3]).replace(/\D/g, '');
+    if (phones.some(function (p) { return p.length >= 7 && digits.indexOf(p) >= 0; })) withPhone++;
+    var m = String(r[3]).match(/Ваш номер (\d+)/);
+    if (m) { checkedNumbers++; if (Number(m[1]) !== Number(numbers[r[0]])) wrongNumber++; }
+  });
+  out.push(result_(44, 'Журнал SMS: токен, тип, тема, текст, время; без полного телефона',
+    log.length ? (incomplete === 0 && withPhone === 0) : false,
+    log.length ? 'Строк: ' + log.length + ', неполных: ' + incomplete + ', с полным телефоном: ' + withPhone + '.'
+      : 'Журнал пуст — сделай «Создать демо-день».'));
+  out.push(result_(42, 'Номер в SMS совпадает с номером приёма', checkedNumbers ? (wrongNumber === 0 ? 'частично' : false) : false,
+    checkedNumbers ? 'Проверено SMS с номером: ' + checkedNumbers + ', расхождений: ' + wrongNumber +
+      '. Номер на странице, экране и в регистратуре берётся из той же колонки «Номер». Глазами сверяешь ты.'
+      : 'В журнале нет SMS с номером.'));
+  return out;
 }
 
 function result_(num, title, ok, details) {

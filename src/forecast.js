@@ -44,8 +44,12 @@ function forecastDoctorDay_(appts, lunchStartMin, now) {
       return;
     }
 
-    // Ещё не начался: позднее из «назначенное», «врач освободится» и «сейчас» (тест 37).
-    var f = maxDate_([a.at, free || a.at, now]);
+    // Ещё не начался: позднее из «назначенное» и «врач освободится» (тест 37).
+    // «Сейчас» добавляем только для пришедшего: его примут не раньше, чем сейчас. Не пришедшего «сейчас»
+    // не двигает — иначе его время ехало бы вслед за часами и он никогда не считался бы опоздавшим.
+    var candidates = [a.at, free || a.at];
+    if (isDate_(a.arrivedAt)) candidates.push(now);
+    var f = maxDate_(candidates);
     var shown = interval_(a.at, f, now, prev);
     result[a.key] = { forecast: f, lower: shown.lower, upper: shown.upper };
 
