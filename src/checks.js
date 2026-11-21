@@ -4,9 +4,9 @@
  * Итог: 'прошёл', 'не прошёл' или 'частично' (часть теста проверяется на следующих этапах).
  */
 
-function runChecks() {
-  var appts = readRows(SHEETS.APPOINTMENTS);
-  var bookings = readRows(SHEETS.BOOKINGS);
+function runChecks_() {
+  var appts = readRows_(SHEETS.APPOINTMENTS);
+  var bookings = readRows_(SHEETS.BOOKINGS);
   return [
     check28_(appts),
     check30_(bookings),
@@ -19,7 +19,7 @@ function runChecks() {
 function check28_(appts) {
   var tokens = appts.map(function (r) { return r[apptCol_('Токен')]; });
   if (!tokens.length) return result_(28, 'Формат токенов', false, 'Приёмов нет — сначала «Создать демо-день».');
-  var bad = tokens.filter(function (t) { return !isTokenFormat(t); });
+  var bad = tokens.filter(function (t) { return !isTokenFormat_(t); });
   return result_(28, 'Формат токенов', bad.length === 0,
     'Приёмов: ' + tokens.length + '. Длина ' + CONFIG.TOKEN_LENGTH + ', алфавит из 32 символов. ' +
     (bad.length ? 'Неправильных: ' + bad.length : 'Все правильные.') + ' Пример: ' + tokens[0]);
@@ -31,7 +31,7 @@ function check30_(bookings) {
   if (tokens.length < 2) return result_(30, 'Соседние токены не похожи', false, 'Мало записей.');
   var alike = 0;
   for (var i = 1; i < tokens.length; i++) {
-    if (tokensLookAlike(tokens[i - 1], tokens[i])) alike++;
+    if (tokensLookAlike_(tokens[i - 1], tokens[i])) alike++;
   }
   var unique = {};
   tokens.forEach(function (t) { unique[t] = true; });
@@ -44,7 +44,7 @@ function check30_(bookings) {
 
 /** 42. Номера незакрытых приёмов разные, не больше трёх цифр. */
 function check42_(appts) {
-  var open = appts.filter(function (r) { return OPEN_STATUSES.indexOf(r[apptCol_('Статус')]) >= 0; });
+  var open = appts.filter(function (r) { return isOpenStatus_(r[apptCol_('Статус')]); });
   if (!open.length) return result_(42, 'Номер в очереди', false, 'Незакрытых приёмов нет.');
   var seen = {}, dup = 0, bad = 0;
   open.forEach(function (r) {
@@ -63,25 +63,25 @@ function check42_(appts) {
 function check43_() {
   var errors = [];
   var ref = new Date(2026, 10, 20, 9, 0, 0);
-  var d = parseDemoTime('20.11.2026 15:00', ref);
+  var d = parseDemoTime_('20.11.2026 15:00', ref);
   if (!d || d.getHours() !== 15 || d.getMinutes() !== 0 || d.getDate() !== 20) errors.push('не разобрано «20.11.2026 15:00»');
-  var t = parseDemoTime('15:00', ref);
+  var t = parseDemoTime_('15:00', ref);
   if (!t || t.getHours() !== 15 || t.getDate() !== 20) errors.push('не разобрано «15:00»');
-  if (parseDemoTime('завтра', ref) !== null) errors.push('принят непонятный текст');
+  if (parseDemoTime_('завтра', ref) !== null) errors.push('принят непонятный текст');
   // Время идёт: вписали 15:00 в момент real → через 90 секунд должно быть 15:01:30.
   var real = Date.UTC(2026, 10, 20, 7, 12, 0);
   var offset = d.getTime() - real;
-  var later = computeNow(real + 90000, offset);
+  var later = computeNow_(real + 90000, offset);
   if (later.getTime() - d.getTime() !== 90000) errors.push('время не идёт от вписанного');
   // +3 минуты: сдвиг на 180 секунд.
-  if (computeNow(real, offset + 3 * 60000).getTime() - d.getTime() !== 180000) errors.push('+3 минуты не работает');
+  if (computeNow_(real, offset + 3 * 60000).getTime() - d.getTime() !== 180000) errors.push('+3 минуты не работает');
   // Пустая ячейка: сдвиг 0 = настоящие часы.
-  if (computeNow(real, 0).getTime() !== real) errors.push('без демо-времени не настоящие часы');
+  if (computeNow_(real, 0).getTime() !== real) errors.push('без демо-времени не настоящие часы');
 
-  var mode = isDemoTime() ? 'демо-время' : 'настоящие часы';
+  var mode = isDemoTime_() ? 'демо-время' : 'настоящие часы';
   return result_(43, 'Демо-время (функция времени)', errors.length ? false : 'частично',
     (errors.length ? 'Ошибки: ' + errors.join('; ') + '. ' : 'Разбор времени, ход часов и сдвиг +3 — верно. ') +
-    'Сейчас: ' + formatDateTime(now()) + ' (' + mode + '). Кнопка «+3 минуты» и все модули — этап 3.');
+    'Сейчас: ' + formatDateTime_(now_()) + ' (' + mode + '). Кнопка «+3 минуты» и все модули — этап 3.');
 }
 
 function result_(num, title, ok, details) {

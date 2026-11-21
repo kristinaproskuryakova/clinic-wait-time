@@ -10,7 +10,7 @@ function menuCreateDemoDay() {
     ui.ButtonSet.YES_NO);
   if (answer !== ui.Button.YES) return;
   try {
-    ui.alert(createDemoDay());
+    ui.alert(createDemoDay_());
   } catch (e) {
     ui.alert(e.message);
   }
@@ -24,9 +24,9 @@ function menuCreateDemoDay() {
  *  - по несколько записей через 1, 2, 3, 4 дня (без воскресений).
  * Потом сервис очереди создаёт приёмы с номерами.
  */
-function createDemoDay() {
+function createDemoDay_() {
   setupSheets();
-  var today = startOfDay_(now());
+  var today = startOfDay_(now_());
   if (CONFIG.WORK_DAYS.indexOf(today.getDay()) < 0) {
     throw new Error('Сегодня по демо-времени выходной — клиника закрыта. ' +
       'Впиши в «Демо-время» рабочий день (пн–сб) и запусти снова.');
@@ -44,7 +44,7 @@ function createDemoDay() {
   function addBooking(doctor, apptDate, createdAt) {
     patientNo++;
     bookings.push([
-      generateToken(),
+      generateToken_(),
       'P' + String(10000 + patientNo),
       demoName_(patientNo),
       doctor[0], doctor[1],
@@ -80,9 +80,9 @@ function createDemoDay() {
 
   var sheet = ss.getSheetByName(SHEETS.BOOKINGS);
   sheet.getRange(2, 1, bookings.length, bookings[0].length).setValues(bookings);
-  var created = syncFromBookings();
+  var created = syncFromBookings_();
   return 'Готово: врачей ' + DEMO_DOCTORS.length + ', записей ' + bookings.length +
-    ', приёмов ' + created + '. Сегодня по демо-времени: ' + formatDateTime(now()).slice(0, 10) + '.';
+    ', приёмов ' + created + '. Сегодня по демо-времени: ' + formatDateTime_(now_()).slice(0, 10) + '.';
 }
 
 // ---------- внутреннее ----------

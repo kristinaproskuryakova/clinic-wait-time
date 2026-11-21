@@ -1,11 +1,11 @@
 /**
- * ЕДИНОЕ ВРЕМЯ. Все модули узнают «сейчас» только через now(). Часы напрямую никто не берёт.
+ * ЕДИНОЕ ВРЕМЯ. Все модули узнают «сейчас» только через now_(). Часы напрямую никто не берёт.
  *
  * Как работает демо-время:
  *  - ячейка «Демо-время» в листе «Настройки» пустая → настоящие часы;
  *  - вписали время (например 15:00) → скрипт запоминает сдвиг «демо минус настоящие часы»,
  *    и дальше «сейчас» = настоящие часы + сдвиг, то есть время идёт от 15:00 как обычные часы;
- *  - addDemoMinutes(3) прибавляет 3 минуты к сдвигу (кнопка «+3 минуты», этап 3).
+ *  - addDemoMinutes_(3) прибавляет 3 минуты к сдвигу (кнопка «+3 минуты», этап 3).
  */
 
 var DEMO_PROP_TEXT = 'DEMO_TIME_TEXT';     // что было вписано в ячейку, когда считали сдвиг
@@ -13,32 +13,32 @@ var DEMO_PROP_OFFSET = 'DEMO_OFFSET_MS';   // сдвиг в миллисекун
 var DEMO_SETTING_NAME = 'Демо-время';
 
 /** Текущее время для всех модулей. */
-function now() {
-  return computeNow(Date.now(), currentDemoOffsetMs_());
+function now_() {
+  return computeNow_(Date.now(), currentDemoOffsetMs_());
 }
 
 /** Включено ли демо-время. */
-function isDemoTime() {
+function isDemoTime_() {
   return readDemoCellText_() !== '';
 }
 
 /** Прибавить минуты к демо-времени (кнопка «+3 минуты»). Если демо-время не включено, включает его. */
-function addDemoMinutes(minutes) {
+function addDemoMinutes_(minutes) {
   var props = PropertiesService.getScriptProperties();
   var offset = currentDemoOffsetMs_();
-  if (!isDemoTime()) {
+  if (!isDemoTime_()) {
     // Включаем демо-время от настоящих часов.
-    var text = formatDateTime(new Date());
+    var text = formatDateTime_(new Date());
     writeDemoCellText_(text);
     props.setProperty(DEMO_PROP_TEXT, text);
     offset = 0;
   }
   props.setProperty(DEMO_PROP_OFFSET, String(offset + minutes * 60000));
-  return now();
+  return now_();
 }
 
 /** «Сейчас» из настоящих часов и сдвига. Отдельная функция, чтобы её можно было проверить. */
-function computeNow(realMs, offsetMs) {
+function computeNow_(realMs, offsetMs) {
   return new Date(realMs + (offsetMs || 0));
 }
 
@@ -46,7 +46,7 @@ function computeNow(realMs, offsetMs) {
  * Разбирает текст демо-времени: «20.11.2026 15:00», «20.11.2026 15:00:30» или «15:00» (тогда дата — today).
  * Возвращает Date или null, если текст непонятен.
  */
-function parseDemoTime(text, today) {
+function parseDemoTime_(text, today) {
   var s = String(text).trim();
   var m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2})[:.](\d{2})(?::(\d{2}))?$/);
   if (m) {
@@ -60,13 +60,13 @@ function parseDemoTime(text, today) {
 }
 
 /** Дата и время в виде «20.11.2026 15:00». */
-function formatDateTime(d) {
+function formatDateTime_(d) {
   return pad2_(d.getDate()) + '.' + pad2_(d.getMonth() + 1) + '.' + d.getFullYear() + ' ' +
     pad2_(d.getHours()) + ':' + pad2_(d.getMinutes());
 }
 
 /** Время в виде «15:00». */
-function formatTime(d) {
+function formatTime_(d) {
   return pad2_(d.getHours()) + ':' + pad2_(d.getMinutes());
 }
 
@@ -97,7 +97,7 @@ function currentDemoOffsetMs_() {
   }
   if (text !== props.getProperty(DEMO_PROP_TEXT)) {
     var realNow = Date.now();
-    var demo = parseDemoTime(text, new Date(realNow));
+    var demo = parseDemoTime_(text, new Date(realNow));
     if (!demo) {
       throw new Error('Не понимаю демо-время «' + text + '». Пример: 20.11.2026 15:00 или 15:00.');
     }
@@ -121,7 +121,7 @@ function readDemoCellText_() {
   var cell = demoCell_();
   if (!cell) return '';
   var v = cell.getValue();
-  if (v instanceof Date) return formatDateTime(v); // таблица сама превратила текст в дату
+  if (v instanceof Date) return formatDateTime_(v); // таблица сама превратила текст в дату
   return String(v).trim();
 }
 

@@ -51,6 +51,19 @@ function formatSheets_() {
       sheet.getRange(2, c, rows, 1).setNumberFormat(formats[name][col]);
     });
   });
+
+  // Колонка «Статус» в «Приёмах» — выпадающий список из STATUS (config.js).
+  var appts = ss.getSheetByName(SHEETS.APPOINTMENTS);
+  if (appts) {
+    var statuses = Object.keys(STATUS).map(function (k) { return STATUS[k]; });
+    var rule = SpreadsheetApp.newDataValidation()
+      .requireValueInList(statuses, true)
+      .setAllowInvalid(true) // набранное руками не запрещаем (код понимает «е» вместо «ё»), но помечаем
+      .setHelpText('Выбери статус из списка: ' + statuses.join(', '))
+      .build();
+    var statusCol = COLUMNS[SHEETS.APPOINTMENTS].indexOf('Статус') + 1;
+    appts.getRange(2, statusCol, Math.max(appts.getMaxRows() - 1, 1), 1).setDataValidation(rule);
+  }
 }
 
 /** Меню «Clinic Wait Time» в таблице. Срабатывает само при открытии таблицы. */
@@ -60,6 +73,7 @@ function onOpen() {
       .createMenu('Clinic Wait Time')
       .addItem('Создать демо-день', 'menuCreateDemoDay')
       .addItem('Обновить очередь из записей', 'menuSyncFromBookings')
+      .addItem('Ссылка пациента (выделенная строка «Приёмов»)', 'menuShowPatientLink')
       .addSeparator()
       .addItem('Служебные ссылки', 'menuShowStaffLinks')
       .addItem('Создать листы', 'setupSheets')
@@ -69,7 +83,11 @@ function onOpen() {
   }
 }
 
+/**
+ * Пункты меню (menu…) работают только из таблицы: первой строкой берут окно таблицы,
+ * поэтому вызов со страницы сразу падает. Остальные внутренние функции закрыты знаком «_» в конце имени.
+ */
 function menuSyncFromBookings() {
-  var n = syncFromBookings();
-  SpreadsheetApp.getUi().alert('Создано новых приёмов: ' + n);
+  var ui = SpreadsheetApp.getUi();
+  ui.alert('Создано новых приёмов: ' + syncFromBookings_());
 }

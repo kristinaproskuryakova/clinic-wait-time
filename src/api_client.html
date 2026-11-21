@@ -1,0 +1,38 @@
+<script>
+  /*
+   * ВСЕ обращения страниц к данным — здесь, в одном месте.
+   * Сейчас страницы живут в Apps Script и зовут сервер через google.script.run.
+   * Если страницы переедут на GitHub Pages, меняется только этот файл (на fetch к адресу Apps Script).
+   */
+  var Api = {
+    getPatientView: function (token, deviceId) {
+      return new Promise(function (resolve, reject) {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .getPatientView(token, deviceId);
+      });
+    },
+  };
+
+  /** Метка этого браузера для подсчёта неверных попыток (тест 31). Хранится в браузере. */
+  function deviceId() {
+    var key = 'cwt-device';
+    try {
+      var id = localStorage.getItem(key);
+      if (!id) {
+        id = randomId();
+        localStorage.setItem(key, id);
+      }
+      return id;
+    } catch (e) {
+      return randomId(); // хранилище браузера недоступно — метка только на этот раз
+    }
+  }
+
+  function randomId() {
+    var a = new Uint8Array(16);
+    crypto.getRandomValues(a);
+    return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
+</script>

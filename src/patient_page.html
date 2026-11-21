@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bg: #f4f6f8; --card: #ffffff; --text: #16191d; --muted: #5d6670; --line: #e3e7eb;
+      --accent: #0b6bcb; --accent-text: #ffffff; --warn: #9a5b00; --off: #8a939c;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #111417; --card: #1b1f24; --text: #eef1f4; --muted: #a3acb6; --line: #2c3238;
+              --accent: #4a9cf0; --accent-text: #0b1520; --warn: #f0b35a; --off: #7c858e; }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; min-height: 100%;
+      padding: 16px; gap: 12px;
+    }
+    .card {
+      background: var(--card); border-radius: 16px; padding: 18px 18px 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08); flex: 1; display: flex; flex-direction: column; gap: 14px;
+    }
+    .label { color: var(--muted); font-size: 14px; }
+    .number { font-size: clamp(44px, 14vw, 64px); font-weight: 800; line-height: 1; letter-spacing: .02em; }
+    .who { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 16px; margin: 0; }
+    .who dt { color: var(--muted); }
+    .who dd { margin: 0; font-weight: 600; }
+    .when { border-top: 1px solid var(--line); padding-top: 14px; }
+    .date { color: var(--muted); font-size: 15px; }
+    .time { font-size: clamp(36px, 11vw, 48px); font-weight: 800; line-height: 1.1; }
+    .message { font-size: 17px; line-height: 1.35; margin: 0; }
+    .cancelled .time { color: var(--off); text-decoration: line-through; }
+    .btn {
+      display: block; text-align: center; text-decoration: none; font-weight: 600; font-size: 16px;
+      background: var(--accent); color: var(--accent-text); border-radius: 12px; padding: 14px;
+    }
+    /* Невысокие экраны (маленькие телефоны + плашка Google): всё плотнее, чтобы влезло без прокрутки (тест 32). */
+    @media (max-height: 560px) {
+      body { padding: 10px; gap: 8px; }
+      .card { padding: 12px 14px; gap: 8px; }
+      .number { font-size: 40px; }
+      .time { font-size: 34px; }
+      .who, .message { font-size: 15px; }
+      .when { padding-top: 8px; }
+      .btn { padding: 11px; }
+    }
+    .center { margin: auto 0; text-align: center; }
+    .center h1 { font-size: 22px; margin: 0 0 8px; }
+    .center p { color: var(--muted); margin: 0; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <section id="loading" class="card"><div class="center"><p>Загружаем данные о приёме…</p></div></section>
+
+  <section id="appt" class="card" hidden>
+    <div>
+      <div class="label">Ваш номер в очереди</div>
+      <div class="number" id="number"></div>
+    </div>
+    <dl class="who">
+      <dt>Врач</dt><dd id="doctor"></dd>
+      <dt>Отделение</dt><dd id="department"></dd>
+    </dl>
+    <div class="when">
+      <div class="date" id="date"></div>
+      <div class="time" id="time"></div>
+    </div>
+    <p class="message" id="message"></p>
+  </section>
+
+  <section id="problem" class="card" hidden>
+    <div class="center"><h1 id="problemTitle"></h1><p id="problemText"></p></div>
+  </section>
+
+  <a id="reschedule" class="btn" href="<?= rescheduleUrl ?>" target="_top" hidden>Перенести или отменить приём</a>
+
+  <?!= include_('api_client'); ?>
+  <script>
+    var TOKEN = <?!= JSON.stringify(token) ?>;
+
+    function show(id) {
+      ['loading', 'appt', 'problem'].forEach(function (s) { document.getElementById(s).hidden = s !== id; });
+    }
+    function problem(title, text) {
+      document.getElementById('problemTitle').textContent = title;
+      document.getElementById('problemText').textContent = text;
+      show('problem');
+    }
+
+    Api.getPatientView(TOKEN, deviceId()).then(function (res) {
+      if (res.state === 'invalid') return problem('Ссылка недействительна', 'Проверьте ссылку из SMS.');
+      if (res.state === 'blocked') return problem('Слишком много неверных попыток',
+        'Доступ временно закрыт. Попробуйте через ' + res.minutes + ' минут.');
+      var v = res.view;
+      document.getElementById('number').textContent = v.number;
+      document.getElementById('doctor').textContent = v.doctor;
+      document.getElementById('department').textContent = v.department;
+      document.getElementById('date').textContent = v.dateText;
+      document.getElementById('time').textContent = v.timeText;
+      document.getElementById('message').textContent = v.message;
+      document.getElementById('appt').className = 'card ' + v.kind;
+      document.getElementById('reschedule').hidden = false; // кнопка видна при любом статусе (тест 45)
+      show('appt');
+    }).catch(function () {
+      problem('Не удалось загрузить', 'Обновите страницу через минуту.');
+    });
+  </script>
+</body>
+</html>

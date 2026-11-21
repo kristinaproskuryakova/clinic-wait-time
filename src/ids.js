@@ -3,15 +3,15 @@
  */
 
 /** Новый случайный токен: CONFIG.TOKEN_LENGTH символов из CONFIG.TOKEN_ALPHABET. Тест 28. */
-function generateToken() {
+function generateToken_() {
   // Случайные байты: хеш от двух случайных UUID.
   var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,
     Utilities.getUuid() + Utilities.getUuid());
-  return tokenFromBytes(bytes, CONFIG.TOKEN_ALPHABET, CONFIG.TOKEN_LENGTH);
+  return tokenFromBytes_(bytes, CONFIG.TOKEN_ALPHABET, CONFIG.TOKEN_LENGTH);
 }
 
 /** Превращает байты в токен. В алфавите 32 символа, поэтому все символы равновероятны. */
-function tokenFromBytes(bytes, alphabet, length) {
+function tokenFromBytes_(bytes, alphabet, length) {
   if (bytes.length < length) throw new Error('Мало случайных байтов для токена');
   var out = '';
   for (var i = 0; i < length; i++) {
@@ -21,7 +21,7 @@ function tokenFromBytes(bytes, alphabet, length) {
 }
 
 /** Похож ли токен на правильный по форме (длина и алфавит). */
-function isTokenFormat(token) {
+function isTokenFormat_(token) {
   if (typeof token !== 'string' || token.length !== CONFIG.TOKEN_LENGTH) return false;
   for (var i = 0; i < token.length; i++) {
     if (CONFIG.TOKEN_ALPHABET.indexOf(token.charAt(i)) < 0) return false;
@@ -33,7 +33,7 @@ function isTokenFormat(token) {
  * «Похожи» ли два токена (тест 30): общее начало из 3+ символов
  * или 6+ совпадающих символов на тех же местах. У случайных токенов такое почти не бывает.
  */
-function tokensLookAlike(a, b) {
+function tokensLookAlike_(a, b) {
   var prefix = 0;
   while (prefix < a.length && a.charAt(prefix) === b.charAt(prefix)) prefix++;
   var same = 0;
@@ -46,7 +46,7 @@ function tokensLookAlike(a, b) {
 /**
  * Наименьший свободный номер от 1 до max. used — занятые номера незакрытых приёмов. Тест 42.
  */
-function lowestFreeNumber(used, max) {
+function lowestFreeNumber_(used, max) {
   var taken = {};
   used.forEach(function (n) { taken[Number(n)] = true; });
   for (var n = 1; n <= max; n++) {
@@ -56,7 +56,7 @@ function lowestFreeNumber(used, max) {
 }
 
 /** 4 последние цифры телефона. */
-function phoneLast4(phone) {
+function phoneLast4_(phone) {
   var digits = String(phone).replace(/\D/g, '');
   return digits.slice(-4);
 }
